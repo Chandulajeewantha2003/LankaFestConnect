@@ -1,0 +1,3 @@
+// AuthorityDashboardScreen - Tourism Authority / Guide flow
+// TODO: Implement verification, reports and public alert workflows.
+export default function AuthorityDashboardScreen() { return null; }
