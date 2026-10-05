@@ -2,11 +2,26 @@
   "expo": {
     "name": "LankaFest Connect",
     "slug": "lankafest-connect",
+    "icon": "./assets/applogo.png",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
-    "android": { "package": "com.eventra.lankafestconnect" },
-    "ios": { "bundleIdentifier": "com.eventra.lankafestconnect" }
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.eventra.lankafestconnect"
+    },
+    "ios": {
+      "bundleIdentifier": "com.eventra.lankafestconnect"
+    },
+    "web": {
+      "favicon": "./assets/applogo.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-font"
+    ]
   }
 }

@@ -8,6 +8,6 @@
     "target": "ES2022",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./"
+    "rootDir": "./src"
   }
 }

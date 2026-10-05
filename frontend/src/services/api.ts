@@ -1,15 +1,34 @@
-// Configure Axios/fetch after dependencies are installed.
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { UserRole } from '../types';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
-
+export interface User { id: string; fullName: string; email: string; role: UserRole | null; authorityApproved: boolean; }
+export interface Session { token: string; user: User; }
+let token: string | null = null;
+export async function saveToken(value: string | null) {
+ token = value;
+ // On web, sessions are memory-only so bearer tokens are never persisted in browser storage.
+ if (Platform.OS !== 'web') {
+  if (value) await SecureStore.setItemAsync('lankafest.session', value);
+  else await SecureStore.deleteItemAsync('lankafest.session');
+ }
+}
+export async function restoreToken() {
+ token = Platform.OS === 'web' ? null : await SecureStore.getItemAsync('lankafest.session');
+ return token;
+}
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
-  return response.json() as Promise<T>;
+ const controller = new AbortController();
+ const timeout = setTimeout(() => controller.abort(), 15000);
+ try {
+  const response = await fetch(API_BASE_URL + path, { ...options, signal: controller.signal,
+   headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...options.headers } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(Array.isArray(data.message) ? data.message.join('\n') : data.message ?? 'Request failed. Please try again.');
+  return data as T;
+ } catch (error) {
+  if (error instanceof Error && error.name === 'AbortError') throw new Error('Connection timed out. Check your connection and try again.');
+  if (error instanceof TypeError) throw new Error('Cannot reach the server. Check the API address and your connection.');
+  throw error;
+ } finally { clearTimeout(timeout); }
 }

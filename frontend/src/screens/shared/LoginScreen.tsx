@@ -1,2 +1,1 @@
-// LoginScreen - shared flow
-export default function LoginScreen() { return null; }
+export { default } from '../welcome/login/LoginScreen';

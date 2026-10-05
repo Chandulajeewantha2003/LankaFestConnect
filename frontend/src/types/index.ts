@@ -1,4 +1,4 @@
-export type UserRole = 'SEEKER' | 'ORGANIZER' | 'AUTHORITY' | 'GUIDE';
+export type UserRole = 'SEEKER' | 'ORGANIZER' | 'AUTHORITY';
 
 export interface EventSummary {
   id: string;

@@ -1,2 +1,1 @@
-// RoleSelectionScreen - shared flow
-export default function RoleSelectionScreen() { return null; }
+export { default } from '../welcome/role/RoleSelectionScreen';

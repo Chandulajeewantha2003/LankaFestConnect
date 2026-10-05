@@ -1,3 +1,4 @@
-// AuthorityDashboardScreen - Tourism Authority / Guide flow
-// TODO: Implement verification, reports and public alert workflows.
-export default function AuthorityDashboardScreen() { return null; }
+import React from 'react';
+import RoleDashboard from '../shared/RoleDashboard';
+import { User } from '../../services/api';
+export default function AuthorityDashboardScreen(props: { user: User; logout: () => void }) { return <RoleDashboard {...props}/>; }

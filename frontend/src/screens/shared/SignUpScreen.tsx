@@ -1,2 +1,1 @@
-// SignUpScreen - shared flow
-export default function SignUpScreen() { return null; }
+export { default } from '../welcome/registration/RegistrationScreen';

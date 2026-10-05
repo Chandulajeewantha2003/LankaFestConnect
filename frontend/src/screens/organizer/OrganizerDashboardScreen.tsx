@@ -1,3 +1,4 @@
-// OrganizerDashboardScreen - Event Organizer flow
-// TODO: Implement with event CRUD operations and validation.
-export default function OrganizerDashboardScreen() { return null; }
+import React from 'react';
+import RoleDashboard from '../shared/RoleDashboard';
+import { User } from '../../services/api';
+export default function OrganizerDashboardScreen(props: { user: User; logout: () => void }) { return <RoleDashboard {...props}/>; }
