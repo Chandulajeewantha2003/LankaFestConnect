@@ -53,3 +53,11 @@ Photo licensing is recorded in frontend/assets/ATTRIBUTION.md.
 SDK 57 upgrade validation: frontend typecheck and Android/iOS/web bundle exports passed; Expo Doctor passed 21/21 checks. Backend source startup connected to Atlas, protected /auth/me returned 401 without a token, invalid registration returned 400, and all five backend tests passed. No phone UI verification was performed.
 
 Dependency audit after the upgrade: frontend reports 23 advisories (7 moderate, 16 high); backend reports 3 high advisories after adding development tooling. These require a separate dependency security review. Do not use npm audit fix --force without reviewing its proposed SDK and framework version changes.
+
+Event Seeker home now has a local demo event feed with search, category and free-entry filters, heart saving for the current session, a details view, and Home/Explore/Saved/Alerts/Profile tabs. This feed does not query the backend events API. Log in as SEEKER to view it.
+
+Explore filters: Date, Category, Price Range, Location and Language are applied to demo events. Reset clears the draft; Apply returns to event results; Back cancels edits. The custom date input accepts YYYY-MM-DD. Demo dates are fixed sample dates and may not match Today or This Week.
+
+Event seeker demo: saved events, in-app reminders, and selected profile photos are stored locally per user account. Photos can be changed or removed in Profile. Reminders appear under Alerts/Notifications; no scheduled push delivery is configured.
+
+Event maps use Leaflet/OpenStreetMap and OSRM public routing over the internet. Event pins and default starting points are demo coordinates; Get Directions stays inside the app and does not use device GPS.
