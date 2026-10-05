@@ -1,0 +1,49 @@
+name: App checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Backend tests and frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_BASE_URL: http://localhost:3000/api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Build backend and run tests
+        working-directory: backend
+        run: npm test
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Check frontend types
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Build Android, iOS, and web bundles
+        working-directory: frontend
+        run: npx expo export --platform all
