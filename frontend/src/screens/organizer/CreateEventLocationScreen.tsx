@@ -91,13 +91,13 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   const [timeMinute, setTimeMinute] = useState<number>(30);
   const [timePeriod, setTimePeriod] = useState<'AM' | 'PM'>('AM');
 
-  // Helper to parse date string into calendar state (Enforce Oct 2026 minimum constraint)
+  // Helper to parse date string into calendar state (Enforce Oct 6 2026 minimum constraint)
   const openDatePicker = (type: 'startDate' | 'endDate') => {
     setActivePicker(type);
     const targetStr = type === 'startDate' ? startDate : endDate;
     let year = 2026;
     let month = 9; // October (0-indexed)
-    let day = 15;
+    let day = 6;
 
     if (targetStr) {
       const parsed = new Date(targetStr);
@@ -118,14 +118,16 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
       }
     }
 
-    // Enforce 2026 Oct minimum constraint
+    // Enforce October 6 2026 minimum constraint
     if (year < 2026) {
       year = 2026;
       month = 9;
-      day = 15;
+      day = 6;
     } else if (year === 2026 && month < 9) {
       month = 9;
-      day = 15;
+      day = 6;
+    } else if (year === 2026 && month === 9 && day < 6) {
+      day = 6;
     }
 
     setCalYear(year);
@@ -248,7 +250,11 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     // Days 1..daysInMonth
     for (let d = 1; d <= daysInMonth; d++) {
-      const isPastDay = calYear < 2026 || (calYear === 2026 && calMonth < 9); // Only < Oct 2026 is past
+      const isPastDay =
+        calYear < 2026 ||
+        (calYear === 2026 && calMonth < 9) ||
+        (calYear === 2026 && calMonth === 9 && d < 6); // Before Oct 6, 2026 is past/unavailable
+
       const isSelected = calDay === d && !isPastDay;
 
       cells.push(
@@ -294,7 +300,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         if (step === 1) navigation?.navigate('CreateEventBasic', { eventData: getUpdatedEventData(), isEditing });
       }} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Section: Event Location */}
         <Text style={styles.sectionTitle}>Event Location</Text>
 
@@ -338,11 +344,13 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
           {/* Change Location Button */}
           <TouchableOpacity
             style={styles.changeLocationButton}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
             onPress={() => setActivePicker('location')}
           >
-            <Ionicons name="map-outline" size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.changeLocationText}>Change Location</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }} pointerEvents="none">
+              <Ionicons name="map-outline" size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.changeLocationText}>Change Location</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -352,17 +360,17 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         <View style={styles.dateTimeGrid}>
           {/* Row 1: Start Date & Start Time */}
           <View style={styles.row}>
-            <TouchableOpacity style={styles.fieldFlex} onPress={() => openDatePicker('startDate')}>
+            <TouchableOpacity style={styles.fieldFlex} activeOpacity={0.7} onPress={() => openDatePicker('startDate')}>
               <Text style={styles.fieldLabel}>Start Date</Text>
-              <View style={styles.inputWithIcon}>
+              <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
                 <Text style={styles.flexInputText}>{startDate}</Text>
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.fieldFlex} onPress={() => openTimePicker('startTime')}>
+            <TouchableOpacity style={styles.fieldFlex} activeOpacity={0.7} onPress={() => openTimePicker('startTime')}>
               <Text style={styles.fieldLabel}>Start Time</Text>
-              <View style={styles.inputWithIcon}>
+              <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="time-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
                 <Text style={styles.flexInputText}>{startTime}</Text>
               </View>
@@ -371,17 +379,17 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
           {/* Row 2: End Date & End Time */}
           <View style={[styles.row, { marginTop: 14 }]}>
-            <TouchableOpacity style={styles.fieldFlex} onPress={() => openDatePicker('endDate')}>
+            <TouchableOpacity style={styles.fieldFlex} activeOpacity={0.7} onPress={() => openDatePicker('endDate')}>
               <Text style={styles.fieldLabel}>End Date</Text>
-              <View style={styles.inputWithIcon}>
+              <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
                 <Text style={styles.flexInputText}>{endDate}</Text>
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.fieldFlex} onPress={() => openTimePicker('endTime')}>
+            <TouchableOpacity style={styles.fieldFlex} activeOpacity={0.7} onPress={() => openTimePicker('endTime')}>
               <Text style={styles.fieldLabel}>End Time</Text>
-              <View style={styles.inputWithIcon}>
+              <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="time-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
                 <Text style={styles.flexInputText}>{endTime}</Text>
               </View>
@@ -391,8 +399,18 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
       </ScrollView>
 
       {/* Location Picker Modal */}
-      <Modal visible={activePicker === 'location'} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setActivePicker(null)}>
+      <Modal
+        visible={activePicker === 'location'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActivePicker(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setActivePicker(null)}
+          />
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Event Location</Text>
             {PRESET_LOCATIONS.map((loc) => (
@@ -414,13 +432,23 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
-      {/* Calendar Date Picker Modal (Requirement 1: Current Oct 2026 onwards) */}
-      <Modal visible={activePicker === 'startDate' || activePicker === 'endDate'} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActivePicker(null)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+      {/* Calendar Date Picker Modal (Requirement: Current Oct 6 2026 onwards) */}
+      <Modal
+        visible={activePicker === 'startDate' || activePicker === 'endDate'}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActivePicker(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setActivePicker(null)}
+          />
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Date</Text>
 
             {/* Calendar Header with Month/Year Navigation */}
@@ -485,13 +513,23 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.applyButtonText}>Confirm Date</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
-      {/* 12-Hour Time Picker Modal with UP/DOWN Arrows (Requirement 2) */}
-      <Modal visible={activePicker === 'startTime' || activePicker === 'endTime'} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActivePicker(null)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+      {/* 12-Hour Time Picker Modal with UP/DOWN Arrows */}
+      <Modal
+        visible={activePicker === 'startTime' || activePicker === 'endTime'}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActivePicker(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setActivePicker(null)}
+          />
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Time (12-Hour)</Text>
 
             <View style={styles.timePickerRow}>
@@ -546,7 +584,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.applyButtonText}>Confirm Time</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Footer Next Button */}
@@ -754,6 +792,8 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '100%',
     maxWidth: 360,
+    elevation: 10,
+    zIndex: 10,
   },
   modalTitle: {
     fontSize: 16,
