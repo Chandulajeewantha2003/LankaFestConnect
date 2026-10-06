@@ -25,12 +25,14 @@ const PRESET_LOCATIONS = [
   { name: 'Negombo Beach Park', address: 'Negombo, Sri Lanka', city: 'Negombo' },
 ];
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const YEARS = ['2025', '2026', '2027', '2028'];
-const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
-const HOURS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
-const MINUTES = ['00', '15', '30', '45'];
-const PERIODS = ['AM', 'PM'];
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const YEARS = [2026, 2027, 2028, 2029, 2030]; // 2026 or later only
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function CreateEventLocationScreen({ navigation, route }: Props) {
   const eventData = route?.params?.eventData || {};
@@ -43,41 +45,146 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   );
   const [city, setCity] = useState<string>(eventData.city || 'Kandy');
 
-  const [startDate, setStartDate] = useState<string>(eventData.startDate || 'Aug 10, 2025');
-  const [startTime, setStartTime] = useState<string>(eventData.startTime || '6:00 PM');
-  const [endDate, setEndDate] = useState<string>(eventData.endDate || 'Aug 20, 2025');
+  const [startDate, setStartDate] = useState<string>(eventData.startDate || 'Oct 15, 2026');
+  const [startTime, setStartTime] = useState<string>(eventData.startTime || '10:30 AM');
+  const [endDate, setEndDate] = useState<string>(eventData.endDate || 'Oct 20, 2026');
   const [endTime, setEndTime] = useState<string>(eventData.endTime || '11:00 PM');
 
   // Modal pickers state
   const [activePicker, setActivePicker] = useState<'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
 
-  // Selected date components
-  const [selectedMonth, setSelectedMonth] = useState<string>('Aug');
-  const [selectedDay, setSelectedDay] = useState<string>('10');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
+  // Calendar State (Current baseline: October 2026)
+  const [calMonth, setCalMonth] = useState<number>(9); // 0-indexed (9 = October)
+  const [calYear, setCalYear] = useState<number>(2026);
+  const [calDay, setCalDay] = useState<number>(15);
+  const [showYearDropdown, setShowYearDropdown] = useState<boolean>(false);
 
-  // Selected time components
-  const [selectedHour, setSelectedHour] = useState<string>('6');
-  const [selectedMinute, setSelectedMinute] = useState<string>('00');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('PM');
+  // Time Picker State (12-hour format with UP/DOWN arrows)
+  const [timeHour, setTimeHour] = useState<number>(10);
+  const [timeMinute, setTimeMinute] = useState<number>(30);
+  const [timePeriod, setTimePeriod] = useState<'AM' | 'PM'>('AM');
 
+  // Helper to parse date string into calendar state (Enforce Oct 2026 minimum constraint)
   const openDatePicker = (type: 'startDate' | 'endDate') => {
     setActivePicker(type);
+    const targetStr = type === 'startDate' ? startDate : endDate;
+    let year = 2026;
+    let month = 9; // October (0-indexed)
+    let day = 15;
+
+    if (targetStr) {
+      const parsed = new Date(targetStr);
+      if (!isNaN(parsed.getTime())) {
+        year = parsed.getFullYear();
+        month = parsed.getMonth();
+        day = parsed.getDate();
+      } else {
+        const parts = targetStr.split(' ');
+        if (parts.length >= 3) {
+          const mIdx = SHORT_MONTHS.findIndex((m) => m.toLowerCase() === parts[0].toLowerCase().replace(',', ''));
+          if (mIdx !== -1) month = mIdx;
+          const dayVal = parseInt(parts[1].replace(',', ''), 10);
+          if (!isNaN(dayVal)) day = dayVal;
+          const yearVal = parseInt(parts[2], 10);
+          if (!isNaN(yearVal)) year = yearVal;
+        }
+      }
+    }
+
+    // Enforce 2026 Oct minimum constraint
+    if (year < 2026) {
+      year = 2026;
+      month = 9;
+      day = 15;
+    } else if (year === 2026 && month < 9) {
+      month = 9;
+      day = Math.max(day, 6);
+    }
+
+    setCalYear(year);
+    setCalMonth(month);
+    setCalDay(day);
   };
 
+  // Helper to parse time string into 12-hour time picker state
   const openTimePicker = (type: 'startTime' | 'endTime') => {
     setActivePicker(type);
+    const targetStr = type === 'startTime' ? startTime : endTime;
+    let hour = 10;
+    let minute = 30;
+    let period: 'AM' | 'PM' = 'AM';
+
+    if (targetStr) {
+      const isPM = targetStr.toUpperCase().includes('PM');
+      const isAM = targetStr.toUpperCase().includes('AM');
+      period = isPM ? 'PM' : isAM ? 'AM' : 'AM';
+
+      const clean = targetStr.replace(/AM|PM/i, '').trim();
+      const timeParts = clean.split(':');
+      if (timeParts.length >= 2) {
+        const h = parseInt(timeParts[0], 10);
+        const m = parseInt(timeParts[1], 10);
+        if (!isNaN(h) && h >= 1 && h <= 12) hour = h;
+        if (!isNaN(m) && m >= 0 && m <= 59) minute = m;
+      }
+    }
+
+    setTimeHour(hour);
+    setTimeMinute(minute);
+    setTimePeriod(period);
+  };
+
+  // Calendar logic with month constraint (Cannot navigate before Oct 2026)
+  const canGoPrevMonth = calYear > 2026 || (calYear === 2026 && calMonth > 9);
+
+  const handlePrevMonth = () => {
+    if (!canGoPrevMonth) return;
+    if (calMonth === 0) {
+      setCalMonth(11);
+      setCalYear((prev) => prev - 1);
+    } else {
+      setCalMonth((prev) => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calMonth === 11) {
+      setCalMonth(0);
+      setCalYear((prev) => prev + 1);
+    } else {
+      setCalMonth((prev) => prev + 1);
+    }
   };
 
   const applyDateSelection = () => {
-    const formattedDate = `${selectedMonth} ${selectedDay}, ${selectedYear}`;
+    const formattedMonth = SHORT_MONTHS[calMonth];
+    const formattedDate = `${formattedMonth} ${calDay}, ${calYear}`;
     if (activePicker === 'startDate') setStartDate(formattedDate);
     if (activePicker === 'endDate') setEndDate(formattedDate);
     setActivePicker(null);
   };
 
+  // 12-Hour Time UP/DOWN logic (Minute 00-59 by 1)
+  const incrementHour = () => {
+    setTimeHour((prev) => (prev === 12 ? 1 : prev + 1));
+  };
+
+  const decrementHour = () => {
+    setTimeHour((prev) => (prev === 1 ? 12 : prev - 1));
+  };
+
+  const incrementMinute = () => {
+    setTimeMinute((prev) => (prev === 59 ? 0 : prev + 1));
+  };
+
+  const decrementMinute = () => {
+    setTimeMinute((prev) => (prev === 0 ? 59 : prev - 1));
+  };
+
   const applyTimeSelection = () => {
-    const formattedTime = `${selectedHour}:${selectedMinute} ${selectedPeriod}`;
+    const formattedHour = timeHour < 10 ? `0${timeHour}` : `${timeHour}`;
+    const formattedMin = timeMinute < 10 ? `0${timeMinute}` : `${timeMinute}`;
+    const formattedTime = `${formattedHour}:${formattedMin} ${timePeriod}`;
     if (activePicker === 'startTime') setStartTime(formattedTime);
     if (activePicker === 'endTime') setEndTime(formattedTime);
     setActivePicker(null);
@@ -99,6 +206,50 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
     navigation?.navigate('CreateEventMedia', { eventData: updatedEventData, isEditing });
   };
 
+  // Render Days Grid for Calendar
+  const renderCalendarGrid = () => {
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+    const cells: React.ReactNode[] = [];
+
+    // Empty lead cells
+    for (let i = 0; i < firstDay; i++) {
+      cells.push(<View key={`empty-${i}`} style={styles.calendarDayCellEmpty} />);
+    }
+
+    // Days 1..daysInMonth
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isPastDay = calYear === 2026 && calMonth === 9 && d < 6; // Before Oct 6, 2026
+      const isSelected = calDay === d && !isPastDay;
+
+      cells.push(
+        <TouchableOpacity
+          key={`day-${d}`}
+          disabled={isPastDay}
+          style={[
+            styles.calendarDayCell,
+            isSelected && styles.calendarDaySelected,
+            isPastDay && styles.calendarDayDisabled,
+          ]}
+          onPress={() => setCalDay(d)}
+        >
+          <Text
+            style={[
+              styles.calendarDayText,
+              isSelected && styles.calendarDayTextSelected,
+              isPastDay && styles.calendarDayTextDisabled,
+            ]}
+          >
+            {d}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return cells;
+  };
+
   return (
     <View style={styles.container}>
       {/* Top Header matching teammate shared style */}
@@ -106,7 +257,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditing ? 'Edit Location' : 'Create Event'}</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Location & Time' : 'Create Event'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -238,52 +389,68 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         </TouchableOpacity>
       </Modal>
 
-      {/* Date Picker Modal (Month, Day, Year) */}
+      {/* Calendar Date Picker Modal (Requirement 1: Current Oct 2026 onwards) */}
       <Modal visible={activePicker === 'startDate' || activePicker === 'endDate'} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setActivePicker(null)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Date (Month, Day, Year)</Text>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActivePicker(null)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Select Date</Text>
 
-            {/* Month Selection */}
-            <Text style={styles.pickerSubLabel}>Month</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerRow}>
-              {MONTHS.map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[styles.pillItem, selectedMonth === m && styles.pillSelected]}
-                  onPress={() => setSelectedMonth(m)}
-                >
-                  <Text style={[styles.pillText, selectedMonth === m && styles.pillTextSelected]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* Calendar Header with Month/Year Navigation */}
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity
+                onPress={handlePrevMonth}
+                disabled={!canGoPrevMonth}
+                style={[styles.calNavBtn, !canGoPrevMonth && { opacity: 0.3 }]}
+              >
+                <Ionicons name="chevron-back" size={20} color={canGoPrevMonth ? theme.colors.text : theme.colors.muted} />
+              </TouchableOpacity>
 
-            {/* Day Selection */}
-            <Text style={styles.pickerSubLabel}>Day</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerRow}>
-              {DAYS.map((d) => (
-                <TouchableOpacity
-                  key={d}
-                  style={[styles.pillItem, selectedDay === d && styles.pillSelected]}
-                  onPress={() => setSelectedDay(d)}
-                >
-                  <Text style={[styles.pillText, selectedDay === d && styles.pillTextSelected]}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <TouchableOpacity
+                style={styles.calMonthYearTitleRow}
+                onPress={() => setShowYearDropdown(!showYearDropdown)}
+              >
+                <Text style={styles.calMonthYearTitle}>
+                  {MONTH_NAMES[calMonth]} {calYear}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.colors.muted} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
 
-            {/* Year Selection */}
-            <Text style={styles.pickerSubLabel}>Year</Text>
-            <View style={styles.pickerRowStatic}>
-              {YEARS.map((y) => (
-                <TouchableOpacity
-                  key={y}
-                  style={[styles.pillItem, selectedYear === y && styles.pillSelected]}
-                  onPress={() => setSelectedYear(y)}
-                >
-                  <Text style={[styles.pillText, selectedYear === y && styles.pillTextSelected]}>{y}</Text>
-                </TouchableOpacity>
+              <TouchableOpacity onPress={handleNextMonth} style={styles.calNavBtn}>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Year Selector Dropdown (2026 or later only) */}
+            {showYearDropdown && (
+              <View style={styles.yearDropdownContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+                  {YEARS.map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      style={[styles.yearPill, calYear === y && styles.yearPillSelected]}
+                      onPress={() => {
+                        setCalYear(y);
+                        if (y === 2026 && calMonth < 9) setCalMonth(9); // Clamp to Oct 2026 minimum
+                        setShowYearDropdown(false);
+                      }}
+                    >
+                      <Text style={[styles.yearPillText, calYear === y && styles.yearPillTextSelected]}>{y}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Weekday Labels Header */}
+            <View style={styles.weekdayHeader}>
+              {WEEKDAYS.map((w) => (
+                <Text key={w} style={styles.weekdayLabel}>{w}</Text>
               ))}
+            </View>
+
+            {/* Calendar Days Grid */}
+            <View style={styles.calendarGrid}>
+              {renderCalendarGrid()}
             </View>
 
             <TouchableOpacity style={styles.applyButton} onPress={applyDateSelection}>
@@ -293,56 +460,57 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         </TouchableOpacity>
       </Modal>
 
-      {/* Time Picker Modal */}
+      {/* 12-Hour Time Picker Modal with UP/DOWN Arrows (Requirement 2) */}
       <Modal visible={activePicker === 'startTime' || activePicker === 'endTime'} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setActivePicker(null)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Time</Text>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActivePicker(null)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Select Time (12-Hour)</Text>
 
-            {/* Hours */}
-            <Text style={styles.pickerSubLabel}>Hour</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerRow}>
-              {HOURS.map((h) => (
-                <TouchableOpacity
-                  key={h}
-                  style={[styles.pillItem, selectedHour === h && styles.pillSelected]}
-                  onPress={() => setSelectedHour(h)}
-                >
-                  <Text style={[styles.pillText, selectedHour === h && styles.pillTextSelected]}>{h}</Text>
+            <View style={styles.timePickerRow}>
+              {/* Hour Control Box */}
+              <View style={styles.timePickerColumn}>
+                <TouchableOpacity style={styles.timeArrowBtn} onPress={incrementHour}>
+                  <Ionicons name="chevron-up" size={24} color={theme.colors.primary} />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Minutes & Period */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.pickerSubLabel}>Minute</Text>
-                <View style={styles.pickerRowStatic}>
-                  {MINUTES.map((min) => (
-                    <TouchableOpacity
-                      key={min}
-                      style={[styles.pillItem, selectedMinute === min && styles.pillSelected]}
-                      onPress={() => setSelectedMinute(min)}
-                    >
-                      <Text style={[styles.pillText, selectedMinute === min && styles.pillTextSelected]}>{min}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.timeDisplayBox}>
+                  <Text style={styles.timeDisplayText}>{timeHour < 10 ? `0${timeHour}` : timeHour}</Text>
                 </View>
+                <TouchableOpacity style={styles.timeArrowBtn} onPress={decrementHour}>
+                  <Ionicons name="chevron-down" size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.timeControlLabel}>Hour</Text>
               </View>
 
-              <View style={{ width: 100 }}>
-                <Text style={styles.pickerSubLabel}>Period</Text>
-                <View style={styles.pickerRowStatic}>
-                  {PERIODS.map((p) => (
-                    <TouchableOpacity
-                      key={p}
-                      style={[styles.pillItem, selectedPeriod === p && styles.pillSelected]}
-                      onPress={() => setSelectedPeriod(p)}
-                    >
-                      <Text style={[styles.pillText, selectedPeriod === p && styles.pillTextSelected]}>{p}</Text>
-                    </TouchableOpacity>
-                  ))}
+              <Text style={styles.timeSeparator}>:</Text>
+
+              {/* Minute Control Box */}
+              <View style={styles.timePickerColumn}>
+                <TouchableOpacity style={styles.timeArrowBtn} onPress={incrementMinute}>
+                  <Ionicons name="chevron-up" size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <View style={styles.timeDisplayBox}>
+                  <Text style={styles.timeDisplayText}>{timeMinute < 10 ? `0${timeMinute}` : timeMinute}</Text>
                 </View>
+                <TouchableOpacity style={styles.timeArrowBtn} onPress={decrementMinute}>
+                  <Ionicons name="chevron-down" size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.timeControlLabel}>Minute</Text>
+              </View>
+
+              {/* AM / PM Toggle Box */}
+              <View style={[styles.timePickerColumn, { marginLeft: 16 }]}>
+                <TouchableOpacity
+                  style={[styles.periodPill, timePeriod === 'AM' && styles.periodPillSelected]}
+                  onPress={() => setTimePeriod('AM')}
+                >
+                  <Text style={[styles.periodPillText, timePeriod === 'AM' && styles.periodPillTextSelected]}>AM</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.periodPill, timePeriod === 'PM' && styles.periodPillSelected, { marginTop: 8 }]}
+                  onPress={() => setTimePeriod('PM')}
+                >
+                  <Text style={[styles.periodPillText, timePeriod === 'PM' && styles.periodPillTextSelected]}>PM</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -547,7 +715,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -557,13 +725,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     width: '100%',
-    maxHeight: '80%',
+    maxWidth: 360,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
-    marginBottom: 12,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   locationPresetItem: {
     paddingVertical: 12,
@@ -580,51 +749,173 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     marginTop: 2,
   },
-  pickerSubLabel: {
-    fontSize: 12,
+
+  /* Calendar Styling */
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  calNavBtn: {
+    padding: 6,
+  },
+  calMonthYearTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calMonthYearTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
-    marginTop: 8,
-    marginBottom: 4,
   },
-  pickerRow: {
-    flexDirection: 'row',
-    marginVertical: 4,
+  yearDropdownContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    marginBottom: 12,
   },
-  pickerRowStatic: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginVertical: 4,
-  },
-  pillItem: {
+  yearPill: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.sm,
-    backgroundColor: '#F3F4F6',
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#E5E7EB',
     marginRight: 6,
-    marginBottom: 6,
   },
-  pillSelected: {
+  yearPillSelected: {
     backgroundColor: theme.colors.primary,
   },
-  pillText: {
+  yearPillText: {
     fontSize: 13,
-    color: theme.colors.text,
     fontWeight: '600',
+    color: theme.colors.text,
   },
-  pillTextSelected: {
+  yearPillTextSelected: {
+    color: '#FFFFFF',
+  },
+  weekdayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingBottom: 6,
+  },
+  weekdayLabel: {
+    width: 36,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.muted,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  calendarDayCell: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 3,
+    borderRadius: 19,
+  },
+  calendarDayCellEmpty: {
+    width: 38,
+    height: 38,
+    margin: 3,
+  },
+  calendarDaySelected: {
+    backgroundColor: theme.colors.primary,
+  },
+  calendarDayDisabled: {
+    opacity: 0.3,
+  },
+  calendarDayText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '500',
+  },
+  calendarDayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  calendarDayTextDisabled: {
+    color: theme.colors.muted,
+  },
+
+  /* 12-Hour Time Picker Styling with UP/DOWN arrows */
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 16,
+  },
+  timePickerColumn: {
+    alignItems: 'center',
+  },
+  timeArrowBtn: {
+    padding: 8,
+  },
+  timeDisplayBox: {
+    width: 60,
+    height: 50,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeDisplayText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: theme.colors.text,
+  },
+  timeSeparator: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: theme.colors.text,
+    marginHorizontal: 10,
+    marginBottom: 16,
+  },
+  timeControlLabel: {
+    fontSize: 11,
+    color: theme.colors.muted,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  periodPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  periodPillSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  periodPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  periodPillTextSelected: {
     color: '#FFFFFF',
   },
   applyButton: {
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.sm,
-    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
     alignItems: 'center',
     marginTop: 16,
   },
   applyButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
 });
