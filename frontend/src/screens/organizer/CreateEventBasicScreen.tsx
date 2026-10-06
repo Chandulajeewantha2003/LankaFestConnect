@@ -33,6 +33,27 @@ export default function CreateEventBasicScreen({ navigation, route }: Props) {
     existingData.audience || ['All Ages']
   );
 
+  const lastLoadedRef = React.useRef<string>('');
+
+  React.useEffect(() => {
+    const sig = JSON.stringify({
+      id: existingData.id || existingData._id,
+      title: existingData.title,
+      description: existingData.description,
+      category: existingData.category,
+      eventType: existingData.eventType,
+    });
+
+    if (lastLoadedRef.current !== sig) {
+      lastLoadedRef.current = sig;
+      if (existingData.title !== undefined) setTitle(existingData.title);
+      if (existingData.description !== undefined) setDescription(existingData.description);
+      if (existingData.category !== undefined) setCategory(existingData.category);
+      if (existingData.eventType !== undefined) setEventType(existingData.eventType);
+      if (existingData.audience !== undefined) setSelectedAudience(existingData.audience);
+    }
+  }, [route?.params?.eventData]);
+
   const toggleAudience = (option: string) => {
     if (selectedAudience.includes(option)) {
       setSelectedAudience(selectedAudience.filter((item) => item !== option));

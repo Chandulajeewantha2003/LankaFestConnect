@@ -86,26 +86,27 @@ export default function CreateEventMediaScreen({ navigation, route }: Props) {
 
   const isEditing = route?.params?.isEditing || !!(eventData.id || eventData._id);
 
+  const getUpdatedEventData = () => ({
+    ...eventData,
+    images,
+    isPaid,
+    ticketPrice: isPaid ? parseFloat(ticketPrice) || 0 : 0,
+    additionalInfo: {
+      foodAndBeverages,
+      wheelchairAccessible,
+      familyFriendly,
+    },
+  });
+
   const handleNext = () => {
-    const updatedEventData = {
-      ...eventData,
-      images,
-      isPaid,
-      ticketPrice: isPaid ? parseFloat(ticketPrice) || 0 : 0,
-      additionalInfo: {
-        foodAndBeverages,
-        wheelchairAccessible,
-        familyFriendly,
-      },
-    };
-    navigation?.navigate('CreateEventReview', { eventData: updatedEventData, isEditing });
+    navigation?.navigate('CreateEventReview', { eventData: getUpdatedEventData(), isEditing });
   };
 
   return (
     <View style={styles.container}>
       {/* Top Header matching teammate shared style */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation?.navigate('CreateEventLocation', { eventData: getUpdatedEventData(), isEditing })} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Tickets & Media' : 'Create Event'}</Text>
@@ -116,8 +117,8 @@ export default function CreateEventMediaScreen({ navigation, route }: Props) {
       <StepProgressBar
         currentStep={3}
         onStepPress={(step) => {
-          if (step === 1) navigation?.navigate('CreateEventBasic', { eventData, isEditing });
-          if (step === 2) navigation?.navigate('CreateEventLocation', { eventData, isEditing });
+          if (step === 1) navigation?.navigate('CreateEventBasic', { eventData: getUpdatedEventData(), isEditing });
+          if (step === 2) navigation?.navigate('CreateEventLocation', { eventData: getUpdatedEventData(), isEditing });
         }}
       />
 

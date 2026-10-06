@@ -58,7 +58,7 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
     <View style={styles.container}>
       {/* Top Header matching teammate shared style */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation?.navigate('CreateEventMedia', { eventData, isEditing })} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEditing ? 'Review & Save' : 'Create Event'}</Text>

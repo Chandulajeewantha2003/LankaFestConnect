@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -50,6 +50,33 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   const [endDate, setEndDate] = useState<string>(eventData.endDate || 'Oct 20, 2026');
   const [endTime, setEndTime] = useState<string>(eventData.endTime || '11:00 PM');
 
+  // Track event signature to synchronize state when navigating into edit flow
+  const lastLoadedEventRef = useRef<string>('');
+
+  useEffect(() => {
+    const currentSig = JSON.stringify({
+      id: eventData.id || eventData._id,
+      locationName: eventData.locationName,
+      locationAddress: eventData.locationAddress,
+      city: eventData.city,
+      startDate: eventData.startDate,
+      startTime: eventData.startTime,
+      endDate: eventData.endDate,
+      endTime: eventData.endTime,
+    });
+
+    if (lastLoadedEventRef.current !== currentSig) {
+      lastLoadedEventRef.current = currentSig;
+      if (eventData.locationName !== undefined) setLocationName(eventData.locationName || 'Kandy Esala Perahera Ground');
+      if (eventData.locationAddress !== undefined) setLocationAddress(eventData.locationAddress || 'Kandy, Sri Lanka');
+      if (eventData.city !== undefined) setCity(eventData.city || 'Kandy');
+      if (eventData.startDate !== undefined) setStartDate(eventData.startDate || 'Oct 15, 2026');
+      if (eventData.startTime !== undefined) setStartTime(eventData.startTime || '10:30 AM');
+      if (eventData.endDate !== undefined) setEndDate(eventData.endDate || 'Oct 20, 2026');
+      if (eventData.endTime !== undefined) setEndTime(eventData.endTime || '11:00 PM');
+    }
+  }, [route?.params?.eventData]);
+
   // Modal pickers state
   const [activePicker, setActivePicker] = useState<'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
 
@@ -98,7 +125,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
       day = 15;
     } else if (year === 2026 && month < 9) {
       month = 9;
-      day = Math.max(day, 6);
+      day = 15;
     }
 
     setCalYear(year);
@@ -192,18 +219,19 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
   const isEditing = route?.params?.isEditing || !!(eventData.id || eventData._id);
 
+  const getUpdatedEventData = () => ({
+    ...eventData,
+    locationName,
+    locationAddress,
+    city,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+  });
+
   const handleNext = () => {
-    const updatedEventData = {
-      ...eventData,
-      locationName,
-      locationAddress,
-      city,
-      startDate,
-      startTime,
-      endDate,
-      endTime,
-    };
-    navigation?.navigate('CreateEventMedia', { eventData: updatedEventData, isEditing });
+    navigation?.navigate('CreateEventMedia', { eventData: getUpdatedEventData(), isEditing });
   };
 
   // Render Days Grid for Calendar
@@ -220,7 +248,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     // Days 1..daysInMonth
     for (let d = 1; d <= daysInMonth; d++) {
-      const isPastDay = calYear === 2026 && calMonth === 9 && d < 6; // Before Oct 6, 2026
+      const isPastDay = calYear < 2026 || (calYear === 2026 && calMonth < 9); // Only < Oct 2026 is past
       const isSelected = calDay === d && !isPastDay;
 
       cells.push(
@@ -254,7 +282,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
     <View style={styles.container}>
       {/* Top Header matching teammate shared style */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation?.navigate('CreateEventBasic', { eventData: getUpdatedEventData(), isEditing })} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Location & Time' : 'Create Event'}</Text>
@@ -263,7 +291,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
       {/* Progress Bar (Step 2 Details) */}
       <StepProgressBar currentStep={2} onStepPress={(step) => {
-        if (step === 1) navigation?.navigate('CreateEventBasic', { eventData, isEditing });
+        if (step === 1) navigation?.navigate('CreateEventBasic', { eventData: getUpdatedEventData(), isEditing });
       }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
