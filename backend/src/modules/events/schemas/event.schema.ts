@@ -5,6 +5,8 @@ export type EventDocument = Event & Document;
 
 @Schema({ timestamps: true })
 export class Event {
+  @Prop({ type: [String], default: [], select: false }) viewerIds!: string[];
+  @Prop({ type: [String], default: [], select: false }) savedByIds!: string[];
   @Prop({ required: true })
   title!: string;
 
@@ -57,9 +59,9 @@ export class Event {
       familyFriendly: { type: Boolean, default: false },
     },
     default: {
-      foodAndBeverages: true,
+      foodAndBeverages: false,
       wheelchairAccessible: false,
-      familyFriendly: true,
+      familyFriendly: false,
     },
   })
   additionalInfo!: {
@@ -71,16 +73,16 @@ export class Event {
   @Prop({ default: 'Published' })
   status!: 'Published' | 'Upcoming' | 'Past' | 'Draft' | 'Cancelled';
 
-  @Prop({ default: 12400 })
+  @Prop({ default: 0 })
   viewsCount!: number;
 
-  @Prop({ default: 1200 })
+  @Prop({ default: 0 })
   interestedCount!: number;
 
-  @Prop({ default: 850 })
+  @Prop({ default: 0 })
   goingCount!: number;
 
-  @Prop({ default: 'organizer_host_1' })
+  @Prop({ required: true, index: true })
   organizerId!: string;
 }
 

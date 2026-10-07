@@ -41,6 +41,7 @@ export interface EventItem {
   interestedCount?: number;
   goingCount?: number;
   organizerId?: string;
+  organizer?: { id: string; fullName: string } | null;
   createdAt?: string;
 }
 

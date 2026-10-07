@@ -11,6 +11,6 @@ import { AuthGuard } from './auth.guard';
   if (!secret || secret.length < 32 || secret.startsWith('replace-')) throw new Error('Set JWT_SECRET to a random secret of at least 32 characters.');
   return { secret, signOptions: { expiresIn: '7d' } };
  } })],
- controllers: [AuthController], providers: [AuthService, AuthGuard], exports: [AuthGuard, JwtModule],
+ controllers: [AuthController], providers: [AuthService, AuthGuard], exports: [AuthGuard, JwtModule, AuthService],
 })
 export class AuthModule {}

@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { User } from '../../services/api';
-import { Category, DemoEvent, demoEvents } from './data/demoEvents';
+import { apiRequest, User } from '../../services/api';
+import { Category, SeekerEvent } from './data/events';
+import MessagesScreen from '../shared/MessagesScreen';
+import { chats, Conversation } from '../../services/chats';
 import EventDetailsScreen from './EventDetailsScreen';
 import SavedEventsScreen from './SavedEventsScreen';
 import NotificationsScreen from './NotificationsScreen';
 import ProfileScreen from '../shared/ProfileScreen';
+import usePublishedEvents from './usePublishedEvents';
+import useSavedEvents from './useSavedEvents';
 import useSeekerData from './useSeekerData';
 import SearchScreen from './SearchScreen';
 const green = '#0B7A3E';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Tab = 'Home' | 'Explore' | 'Saved' | 'Alerts' | 'Profile';
+type Tab = 'Home' | 'Explore' | 'Saved' | 'Alerts' | 'Profile' | 'Messages';
 const categories: { name: Category; icon: IconName; color: string; background: string }[] = [
  { name: 'All', icon: 'apps', color: green, background: '#E6F2EB' },
  { name: 'Cultural', icon: 'color-palette-outline', color: '#9234C4', background: '#F3E9FA' },
@@ -20,55 +24,64 @@ const categories: { name: Category; icon: IconName; color: string; background: s
  { name: 'Religious', icon: 'business-outline', color: '#00877E', background: '#DCF5F2' },
 ];
 const tabs: { name: Tab; icon: IconName }[] = [
- { name: 'Home', icon: 'home' }, { name: 'Explore', icon: 'compass-outline' }, { name: 'Saved', icon: 'heart-outline' }, { name: 'Alerts', icon: 'notifications-outline' }, { name: 'Profile', icon: 'person-outline' },
+ { name: 'Home', icon: 'home' }, { name: 'Explore', icon: 'compass-outline' }, { name: 'Saved', icon: 'heart-outline' }, { name: 'Alerts', icon: 'notifications-outline' }, { name: 'Messages', icon: 'chatbubbles-outline' },
 ];
 export default function HomeScreen({ user, logout }: { user: User; logout: () => void }) {
+ const { events, loading: eventsLoading, error: eventsError, refresh } = usePublishedEvents();
  const [tab, setTab] = useState<Tab>('Home'), [category, setCategory] = useState<Category>('All'), [query, setQuery] = useState('');
- const { saved, reminders, read, photo, ready, error, toggleSaved, toggleReminder, markRead, setPhoto } = useSeekerData(user.id);
+ const { reminders, read, photo, ready, error, toggleReminder, markRead, setPhoto } = useSeekerData(user.id);
+ const { saved, toggleSaved, error: savedError } = useSavedEvents(user.id);
  const [freeOnly, setFreeOnly] = useState(false), [showAll, setShowAll] = useState(false);
- const [selected, setSelected] = useState<DemoEvent | null>(null);
+ const [chat, setChat] = useState<Conversation | null>(null), [openingChat, setOpeningChat] = useState(false);
+ async function messageOrganizer(event: SeekerEvent) { if (openingChat) return; setOpeningChat(true); try { setChat(await chats.open(event.id)); } catch (err) { Alert.alert('Could not open chat', err instanceof Error ? err.message : 'Please try again.'); } finally { setOpeningChat(false); } }
+ const [selected, setSelected] = useState<SeekerEvent | null>(null);
+ useEffect(() => { if (selected) apiRequest('/events/' + selected.id + '/view', { method: 'POST' }).catch(err => console.warn('Could not record event view:', err.message)); }, [selected?.id]);
  const unreadCount = reminders.filter(id => !read.includes(id)).length;
  const unread = unreadCount > 0;
  const [filtersVisible, setFiltersVisible] = useState(false);
  function changeTab(next: Tab) { setTab(next); setSelected(null); if (next === 'Alerts') markRead(); }
- const filtered = demoEvents.filter(event => (tab !== 'Saved' || saved.includes(event.id)) &&
+ const filtered = events.filter(event => (tab !== 'Saved' || saved.includes(event.id)) &&
   (category === 'All' || event.category === category) && (!freeOnly || event.price === 0) &&
   [event.title, event.city, event.venue, event.category].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
  const displayed = tab === 'Home' && !showAll && category === 'All' && !query && !freeOnly ? filtered.slice(0, 2) : filtered;
  const listingTab = ['Home', 'Explore', 'Saved'].includes(tab);
  const categoryControls = <View style={s.categories}>{categories.map(item => <Pressable key={item.name} accessibilityRole="button" accessibilityLabel={item.name + ' events'} accessibilityState={{ selected: category === item.name }} onPress={() => setCategory(item.name)} style={s.category}><View style={[s.categoryIcon, { backgroundColor: category === item.name ? green : item.background }]}><Ionicons name={item.icon} size={23} color={category === item.name ? '#fff' : item.color}/></View><Text style={[s.categoryLabel, category === item.name && { color: green, fontWeight: '700' }]}>{item.name}</Text></Pressable>)}</View>;
- function card(event: DemoEvent) {
+ function card(event: SeekerEvent) {
   const isSaved = saved.includes(event.id);
   return <View key={event.id} style={s.card}>
    <View style={s.cover}><Pressable accessibilityRole="button" accessibilityLabel={'View ' + event.title} onPress={() => setSelected(event)} style={{ flex: 1 }}><Image source={event.image} style={s.image} resizeMode="cover"/></Pressable>
-    <View pointerEvents="none" style={[s.badge, event.category !== 'Cultural' && { backgroundColor: '#332819' }]}><Ionicons name={event.category === 'Cultural' ? 'shield-checkmark' : 'sparkles'} size={12} color="#fff"/><Text style={s.badgeText}>{event.badge}</Text></View>
+    <View pointerEvents="none" style={[s.badge, event.category !== 'Cultural' && { backgroundColor: '#332819' }]}><Ionicons name={'calendar-outline'} size={12} color="#fff"/><Text style={s.badgeText}>{event.badge}</Text></View>
     <Pressable accessibilityRole="button" accessibilityLabel={(isSaved ? 'Unsave ' : 'Save ') + event.title} accessibilityState={{ selected: isSaved }} onPress={() => toggleSaved(event.id)} style={s.heart}><Ionicons name={isSaved ? 'heart' : 'heart-outline'} size={24} color={isSaved ? '#E4516B' : '#56605A'}/></Pressable>
     <View pointerEvents="none" style={[s.price, event.price === 0 && { backgroundColor: '#fff' }]}><Text style={[s.priceText, event.price === 0 && { color: green }]}>{event.price ? 'LKR ' + event.price.toLocaleString() : 'Free'}</Text></View>
    </View>
    <Pressable accessibilityRole="button" onPress={() => setSelected(event)} style={s.cardBody}><Text style={s.eventTitle}>{event.title}</Text><View style={s.meta}><Ionicons name="location" size={13} color={green}/><Text style={s.metaText}>{event.city}</Text><Text style={s.separator}>·</Text><Ionicons name="calendar-outline" size={13} color="#68726C"/><Text style={s.metaText}>{event.date}</Text></View>
-    <View style={s.cardBottom}><View style={s.venue}><View style={[s.dot, { backgroundColor: event.category === 'Food' ? '#EF9900' : '#11B687' }]}/><Text numberOfLines={1} style={s.metaText}>{event.venue}</Text></View><View style={s.rating}><Ionicons name="star" size={13} color="#D67A00"/><Text style={s.ratingText}>{event.rating}</Text><Text style={s.review}>({event.reviews})</Text></View></View>
+    <View style={s.cardBottom}><View style={s.venue}><View style={[s.dot, { backgroundColor: event.category === 'Food' ? '#EF9900' : '#11B687' }]}/><Text numberOfLines={1} style={s.metaText}>{event.venue}</Text></View></View>
    </Pressable>
   </View>;
  }
+ if (chat) return <MessagesScreen user={user} initial={chat} onBack={() => setChat(null)}/>;
  if (!ready) return <View style={s.empty}><Text style={s.body}>Loading your events…</Text></View>;
  return <View style={s.root}>
+ {eventsError ? <View><Text accessibilityRole="alert" style={s.demoNote}>{eventsError}</Text><Pressable onPress={refresh}><Text style={s.backText}>Retry</Text></Pressable></View> : null}
+ {savedError ? <Text accessibilityRole="alert" style={s.demoNote}>{savedError}</Text> : null}
  {error ? <Text accessibilityRole="alert" style={s.demoNote}>{error}</Text> : null}
- {selected && <EventDetailsScreen event={selected} saved={saved.includes(selected.id)} reminder={reminders.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onReminder={() => toggleReminder(selected.id)} onBack={() => setSelected(null)}/>}
- {!selected && tab === 'Saved' && <SavedEventsScreen saved={saved} reminders={reminders} onSelect={setSelected} onRemove={toggleSaved} onExplore={() => changeTab('Explore')}/>}
- {!selected && tab === 'Alerts' && <NotificationsScreen reminders={reminders} onSelect={setSelected} onRemove={toggleReminder}/>}
+ {selected && <EventDetailsScreen onMessage={() => messageOrganizer(selected)} messaging={openingChat} event={selected} saved={saved.includes(selected.id)} reminder={reminders.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onReminder={() => toggleReminder(selected.id)} onBack={() => setSelected(null)}/>}
+ {!selected && tab === 'Saved' && <SavedEventsScreen allEvents={events} saved={saved} reminders={reminders} onSelect={setSelected} onRemove={toggleSaved} onExplore={() => changeTab('Explore')}/>}
+ {!selected && tab === 'Alerts' && <NotificationsScreen events={events} reminders={reminders} onSelect={setSelected} onRemove={toggleReminder}/>}
+ {!selected && tab === 'Messages' && <MessagesScreen user={user} onBack={() => changeTab('Home')}/>}
  {!selected && tab === 'Profile' && <ProfileScreen user={user} photo={photo} onPhoto={setPhoto} savedCount={saved.length} reminderCount={reminders.length} logout={logout}/>}
-  {tab === 'Explore' && <View style={{ flex: 1, display: selected ? 'none' : 'flex' }}><SearchScreen saved={saved} onToggleSaved={toggleSaved} onSelectEvent={setSelected} onBack={() => changeTab('Home')} onFilterVisibilityChange={setFiltersVisible}/></View>}
+  {tab === 'Explore' && <View style={{ flex: 1, display: selected ? 'none' : 'flex' }}><SearchScreen allEvents={events} saved={saved} onToggleSaved={toggleSaved} onSelectEvent={setSelected} onBack={() => changeTab('Home')} onFilterVisibilityChange={setFiltersVisible}/></View>}
   {tab === 'Home' && !selected && <>
-  <View style={s.header}><View style={s.identity}><View style={s.logoTile}><Image source={require('../../../assets/logo.png')} style={s.logo} resizeMode="contain"/></View><View><Text style={s.brand}><Text style={{ color: green }}>LankaFest</Text> Connect</Text><Text style={s.brandCaption}>SRI LANKA DISCOVERY</Text></View></View><Pressable accessibilityRole="button" accessibilityLabel="Open alerts" onPress={() => changeTab('Alerts')} style={s.notification}><Ionicons name="notifications-outline" size={23} color="#28342C"/>{unread && <View style={s.unread}><Text style={s.unreadText}>{unreadCount}</Text></View>}</Pressable></View>
-  <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+  <View style={s.header}><View style={s.identity}><View style={s.logoTile}><Image source={require('../../../assets/logo.png')} style={s.logo} resizeMode="contain"/></View><View style={{ flex: 1 }}><Text style={s.brand}><Text style={{ color: green }}>LankaFest</Text> Connect</Text><Text style={s.brandCaption}>SRI LANKA DISCOVERY</Text></View></View><View style={s.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Open alerts" onPress={() => changeTab('Alerts')} style={s.notification}><Ionicons name="notifications-outline" size={23} color="#28342C"/>{unread && <View style={s.unread}><Text style={s.unreadText}>{unreadCount}</Text></View>}</Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => changeTab('Profile')} style={s.notification}><Ionicons name="person-outline" size={23} color="#28342C"/></Pressable></View></View>
+  <ScrollView refreshControl={<RefreshControl refreshing={eventsLoading} onRefresh={refresh}/>} showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
    {    <>{tab === 'Home' && <View style={s.greeting}><View style={s.avatar}><>{photo ? <Image source={{ uri: photo }} style={{ width: 46, height: 46, borderRadius: 23 }}/> : <Text style={s.initials}>{user.fullName.slice(0, 1).toUpperCase()}</Text>}</><View style={s.online}><Ionicons name="checkmark" size={10} color="#fff"/></View></View><View style={{ flex: 1 }}><Text style={s.greetingTitle}>Hello, Explorer! <Ionicons name="sparkles-outline" size={14} color="#758078"/></Text><Text style={s.greetingText}>Discover amazing events near you in Sri Lanka</Text></View></View>}
      <View style={s.search}><Ionicons name="search-outline" size={19} color="#758078"/><TextInput accessibilityLabel="Search events, places, or categories" placeholder="Search events, places, or categories..." placeholderTextColor="#6B756E" value={query} onChangeText={setQuery} style={s.searchInput} autoCorrect={false}/>{query.length > 0 && <Pressable accessibilityLabel="Clear search" onPress={() => setQuery('')}><Ionicons name="close-circle" size={19} color="#68726C"/></Pressable>}<Pressable accessibilityRole="button" accessibilityState={{ selected: freeOnly }} accessibilityLabel={freeOnly ? 'Show all prices' : 'Show free events only'} onPress={() => setFreeOnly(!freeOnly)} style={s.filter}><Ionicons name="options-outline" size={20} color={freeOnly ? green : '#758078'}/></Pressable></View>
      {freeOnly && <Pressable onPress={() => setFreeOnly(false)} style={s.filterChip}><Text style={s.filterChipText}>Free events only</Text><Ionicons name="close" color={green} size={16}/></Pressable>}
      <View style={s.sectionHeader}><Text style={s.sectionTitle}>Categories</Text><Text style={s.categoryCount}>5 Types</Text></View>{categoryControls}
      <View style={s.sectionHeader}><View style={s.headingGroup}><Text style={s.sectionTitle}>Upcoming Events</Text><Text style={s.country}>Sri Lanka</Text></View>{tab === 'Home' && <Pressable onPress={() => { setShowAll(!showAll); setCategory('All'); setQuery(''); setFreeOnly(false); }}><Text style={s.seeAll}>{showAll ? 'Show Less' : 'See All'} <Ionicons name="chevron-forward" size={12}/></Text></Pressable>}</View>
-     {displayed.length ? displayed.map(card) : <View style={s.empty}><Ionicons name="search-outline" size={34} color={green}/><Text style={s.eventTitle}>No matching events</Text><Text style={s.body}>Try another category or search.</Text><Pressable onPress={() => { setCategory('All'); setQuery(''); setFreeOnly(false); }}><Text style={s.backText}>Reset filters</Text></Pressable></View>}
+     {displayed.length ? displayed.map(card) : <View style={s.empty}><Ionicons name="search-outline" size={34} color={green}/><Text style={s.eventTitle}>{eventsLoading ? 'Loading events…' : events.length ? 'No matching events' : 'No published events yet'}</Text><Text style={s.body}>Try another category or search.</Text><Pressable onPress={() => { setCategory('All'); setQuery(''); setFreeOnly(false); }}><Text style={s.backText}>Reset filters</Text></Pressable></View>}
     </>}
-   <Text style={s.demoNote}>Demo content · Sample dates, prices, verification, and ratings.{listingTab ? ' Saved events stay on this device.' : ''}</Text>
+   <Text style={s.demoNote}>Saved events are linked to your account. Reminders stay on this device.</Text>
   </ScrollView>
   </>}
   {!filtersVisible && !selected && <View style={s.tabBar}>{tabs.map(item => <Pressable key={item.name} accessibilityRole="tab" accessibilityState={{ selected: tab === item.name }} onPress={() => changeTab(item.name)} style={s.tab}><View><Ionicons name={item.icon} size={23} color={tab === item.name ? green : '#7A817C'}/>{item.name === 'Alerts' && unread && <View style={s.alertDot}/>}</View><Text style={[s.tabLabel, tab === item.name && { color: green, fontWeight: '700' }]}>{item.name}</Text></Pressable>)}</View>}
@@ -77,7 +90,8 @@ export default function HomeScreen({ user, logout }: { user: User; logout: () =>
 const s = StyleSheet.create({
  root: { flex: 1, backgroundColor: '#F7F6F5' },
  header: { width: '100%', maxWidth: 560, alignSelf: 'center', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14 },
- identity: { flexDirection: 'row', alignItems: 'center', gap: 9 }, logoTile: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#E4F1E8', alignItems: 'center', justifyContent: 'center' }, logo: { width: 30, height: 30 }, brand: { fontWeight: '800', fontSize: 19, color: '#202622' }, brandCaption: { fontSize: 9, color: '#68726C', letterSpacing: .7, marginTop: 3 },
+ identity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 9 }, logoTile: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#E4F1E8', alignItems: 'center', justifyContent: 'center' }, logo: { width: 30, height: 30 }, brand: { fontWeight: '800', fontSize: 19, color: '#202622' }, brandCaption: { fontSize: 9, color: '#68726C', letterSpacing: .7, marginTop: 3 },
+ headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8 },
  notification: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E7E7E4', alignItems: 'center', justifyContent: 'center' }, unread: { position: 'absolute', right: 2, top: 1, backgroundColor: '#DE4343', width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, unreadText: { fontSize: 10, fontWeight: '700', color: '#fff' },
  scroll: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24 },
  greeting: { backgroundColor: '#EDF1EF', borderWidth: 1, borderColor: '#DBE3DE', borderRadius: 16, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 16 },

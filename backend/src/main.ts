@@ -4,6 +4,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 async function bootstrap() {
  const app = await NestFactory.create(AppModule);
+ app.getHttpAdapter().getInstance().use(require('express').json({ limit: '10mb' }));
  app.setGlobalPrefix('api');
  app.enableCors({ origin: (process.env.CORS_ORIGIN ?? 'http://localhost:8081').split(',') });
  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));

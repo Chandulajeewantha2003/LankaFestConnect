@@ -1,24 +1,19 @@
-import { DemoEvent } from './demoEvents';
+import { parseEventDate } from '../../../utils/eventSchedule';
+import { SeekerEvent } from './events';
 export type DateFilter = 'Anytime' | 'Today' | 'This Week' | 'This Month' | 'Custom';
 export interface SearchFilters { date: DateFilter; customDate: string; categories: string[]; prices: string[]; location: string; languages: string[]; }
 export function defaultFilters(): SearchFilters { return { date: 'Anytime', customDate: '', categories: [], prices: [], location: 'All Locations', languages: [] }; }
-const metadata: Record<string, { date: string; languages: string[] }> = {
- perahera: { date: '2027-08-10', languages: ['English', 'Sinhala'] },
- food: { date: '2026-11-15', languages: ['English', 'Sinhala', 'Tamil'] },
- music: { date: '2026-11-12', languages: ['English'] },
- temple: { date: '2026-12-05', languages: ['Sinhala'] },
- jazz: { date: '2026-11-18', languages: ['English'] },
- 'beach-dj': { date: '2026-11-20', languages: ['English'] },
- 'local-band': { date: '2026-11-22', languages: ['English', 'Sinhala'] },
-};
+
 export function isValidDate(value: string) {
  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
  const parsed = new Date(value + 'T00:00:00');
  return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === Number(value.slice(0, 4)) && parsed.getMonth() + 1 === Number(value.slice(5, 7)) && parsed.getDate() === Number(value.slice(8, 10));
 }
 export function filterCount(filters: SearchFilters) { return Number(filters.date !== 'Anytime') + filters.categories.length + filters.prices.length + Number(filters.location !== 'All Locations') + filters.languages.length; }
-export function matchesFilters(event: DemoEvent, filters: SearchFilters, now = new Date()) {
- const meta = metadata[event.id];
+export function matchesFilters(event: SeekerEvent, filters: SearchFilters, now = new Date()) {
+ const parsed = parseEventDate(event.startDate);
+ const date = parsed !== null ? [parsed.getFullYear(), String(parsed.getMonth() + 1).padStart(2, '0'), String(parsed.getDate()).padStart(2, '0')].join('-') : '';
+ const meta = { date, languages: [] as string[] };
  if (filters.categories.length && !filters.categories.includes(event.category === 'Food' ? 'Food & Beverage' : event.category)) return false;
  if (filters.location !== 'All Locations' && event.city !== filters.location) return false;
  if (filters.languages.length && !filters.languages.some(language => meta?.languages.includes(language))) return false;

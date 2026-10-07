@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import useStepBack from './useStepBack';
 import { StepProgressBar } from './components/StepProgressBar';
 
 interface Props {
@@ -17,67 +18,43 @@ interface Props {
   route?: any;
 }
 
-const DEFAULT_IMAGES = [
-  'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=600&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400&auto=format&fit=crop',
-];
 
 export default function CreateEventMediaScreen({ navigation, route }: Props) {
   const eventData = route?.params?.eventData || {};
 
   const [images, setImages] = useState<string[]>(
-    eventData.images && eventData.images.length > 0 ? eventData.images : DEFAULT_IMAGES
+    eventData.images ?? []
   );
 
   const [isPaid, setIsPaid] = useState<boolean>(eventData.isPaid || false);
   const [ticketPrice, setTicketPrice] = useState<string>(
-    eventData.ticketPrice ? String(eventData.ticketPrice) : '1500'
+    eventData.ticketPrice ? String(eventData.ticketPrice) : ''
   );
 
   const [foodAndBeverages, setFoodAndBeverages] = useState<boolean>(
-    eventData.additionalInfo?.foodAndBeverages ?? true
+    eventData.additionalInfo?.foodAndBeverages ?? false
   );
   const [wheelchairAccessible, setWheelchairAccessible] = useState<boolean>(
     eventData.additionalInfo?.wheelchairAccessible ?? false
   );
   const [familyFriendly, setFamilyFriendly] = useState<boolean>(
-    eventData.additionalInfo?.familyFriendly ?? true
+    eventData.additionalInfo?.familyFriendly ?? false
   );
 
-  // Gallery image selection supporting expo-image-picker with fallback
+  const [error, setError] = useState('');
   const handlePickImage = async () => {
     try {
       const ImagePicker = await import('expo-image-picker');
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permissionResult.granted) {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.8,
-        });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          if (images.length < 5) {
-            setImages([...images, result.assets[0].uri]);
-          }
-          return;
-        }
-      }
-    } catch (err) {
-      console.log('ImagePicker gallery fallback:', err);
-    }
-
-    if (images.length < 5) {
-      const samplePickerImages = [
-        'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=600&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=600&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=600&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=600&auto=format&fit=crop',
-      ];
-      const nextImg = samplePickerImages[images.length % samplePickerImages.length];
-      setImages([...images, nextImg]);
-    }
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) { setError('Allow photo library access to add images.'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset.base64) { setError('Could not read this image. Choose another image.'); return; }
+      if (asset.base64.length > 1800000) { setError('Choose a smaller image (under 1.3 MB).'); return; }
+      setImages(current => [...current, 'data:' + (asset.mimeType || 'image/jpeg') + ';base64,' + asset.base64].slice(0, 5));
+      setError('');
+    } catch { setError('Could not open your photo library. Please try again.'); }
   };
 
   const handleRemoveImage = (index: number) => {
@@ -99,8 +76,11 @@ export default function CreateEventMediaScreen({ navigation, route }: Props) {
   });
 
   const handleNext = () => {
+    if (isPaid && (!Number.isFinite(Number(ticketPrice)) || Number(ticketPrice) <= 0)) { setError('Enter a ticket price greater than zero.'); return; }
     navigation?.navigate('CreateEventReview', { eventData: getUpdatedEventData(), isEditing });
   };
+
+  useStepBack(() => navigation?.navigate('CreateEventLocation', { eventData: getUpdatedEventData(), isEditing }));
 
   return (
     <View style={styles.container}>
@@ -124,6 +104,7 @@ export default function CreateEventMediaScreen({ navigation, route }: Props) {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Section: Event Images */}
+        {error ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{error}</Text> : null}
         <Text style={styles.sectionTitle}>Event Images</Text>
         <Text style={styles.sectionSubtext}>Add high quality images (up to 5)</Text>
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { View, Button } from 'react-native';
+import { View } from 'react-native';
 import { User } from '../services/api';
+import MessagesScreen from '../screens/shared/MessagesScreen';
+import { OrganizerBottomNav } from '../screens/organizer/components/OrganizerBottomNav';
 import OrganizerAccountScreen from '../screens/organizer/OrganizerAccountScreen';
 import OrganizerDashboardScreen from '../screens/organizer/OrganizerDashboardScreen';
 import CreateEventBasicScreen from '../screens/organizer/CreateEventBasicScreen';
@@ -17,7 +18,7 @@ export default function OrganizerNavigator({ user, logout }: { user: User; logou
 
   const navigation = {
     navigate: (screenName: string, params?: any) => {
-      if (params) setScreenParams(params);
+      setScreenParams(params ?? {});
       setCurrentScreen(screenName);
     },
     goBack: () => {
@@ -29,7 +30,7 @@ export default function OrganizerNavigator({ user, logout }: { user: User; logou
     },
   };
 
-  const route = { params: screenParams };
+  const route = { params: { ...screenParams, user } };
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -45,8 +46,12 @@ export default function OrganizerNavigator({ user, logout }: { user: User; logou
         return <ManageEventScreen navigation={navigation} route={route} />;
       case 'EventInsights':
         return <EventInsightsScreen navigation={navigation} route={route} />;
+      case 'Messages':
+        return <MessagesScreen user={user} initial={screenParams.conversation} onBack={() => navigation.navigate('OrganizerDashboard')}/>;
       case 'Profile':
-        return <View style={{ flex: 1 }}><Button title="Back to events" onPress={() => setCurrentScreen('OrganizerDashboard')} /><OrganizerAccountScreen user={user} logout={logout} /></View>;
+        return <OrganizerAccountScreen user={user} logout={logout} onBack={() => navigation.navigate('OrganizerDashboard')}/>;
+      case 'MyEvents':
+        return <OrganizerDashboardScreen navigation={navigation} route={{ params: { ...route.params, showAll: true } }} />;
       case 'OrganizerDashboard':
       default:
         return <OrganizerDashboardScreen navigation={navigation} route={route} />;
@@ -57,6 +62,7 @@ export default function OrganizerNavigator({ user, logout }: { user: User; logou
     <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
 
       {renderScreen()}
+      {(currentScreen === 'Profile' || currentScreen === 'Messages') && <OrganizerBottomNav activeTab={currentScreen} onTabPress={tab => navigation.navigate({ Home: 'OrganizerDashboard', Events: 'EventInsights', Messages: 'Messages', Profile: 'Profile' }[tab])}/>}
     </View>
   );
 }

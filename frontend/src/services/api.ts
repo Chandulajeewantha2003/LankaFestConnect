@@ -39,12 +39,12 @@ export const organizerEventService = {
     return apiRequest<any[]>('/organizer/events');
   },
   getEventById: async (id: string) => {
-    return apiRequest<any>(`/events/${id}`);
+    return apiRequest<any>(`/organizer/events/${id}`);
   },
   createEvent: async (data: any) => {
     return apiRequest<any>('/events', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(eventPayload(data)),
     });
   },
   updateEvent: async (id: string, data: any) => {
@@ -67,3 +67,5 @@ export const organizerEventService = {
     return apiRequest<any>(`/events/${id}/insights`);
   },
 };
+
+function eventPayload(data: any) { const { id, _id, createdAt, updatedAt, __v, organizerId, viewsCount, interestedCount, goingCount, organizer, ...payload } = data; return payload; }

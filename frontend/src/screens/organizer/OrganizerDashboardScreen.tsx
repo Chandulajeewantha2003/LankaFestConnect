@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { organizerEventService } from '../../services/api';
+import { parseEventDateTime } from '../../utils/eventSchedule';
 import { EventItem } from '../../types';
 import { OrganizerBottomNav } from './components/OrganizerBottomNav';
 
@@ -22,20 +23,17 @@ interface Props {
 
 export default function OrganizerDashboardScreen({ navigation, route }: Props) {
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const fetchEvents = useCallback(async () => {
     try {
       const data = await organizerEventService.getEvents();
-      if (Array.isArray(data) && data.length > 0) {
-        setEvents(data);
-      } else {
-        setEvents(defaultEvents);
-      }
+      setEvents(data);
+      setError('');
     } catch (err) {
-      console.log('Error loading events, using default fallback list:', err);
-      setEvents(defaultEvents);
+      setError(err instanceof Error ? err.message : 'Could not load events. Please retry.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -63,8 +61,8 @@ export default function OrganizerDashboardScreen({ navigation, route }: Props) {
       let isPast = item.status === 'Past';
       if (item.endDate || item.startDate) {
         const dateString = item.endDate || item.startDate;
-        const parsedDate = new Date(dateString);
-        if (!isNaN(parsedDate.getTime())) {
+        const parsedDate = parseEventDateTime(dateString, item.endDate ? item.endTime : item.startTime);
+        if (parsedDate) {
           isPast = parsedDate < now;
         }
       }
@@ -97,22 +95,19 @@ export default function OrganizerDashboardScreen({ navigation, route }: Props) {
         <View style={styles.headerRow}>
           <View style={styles.logoRow}>
             <View style={styles.lotusBadge}>
-              <Ionicons name="flower-outline" size={20} color={theme.colors.primary} />
+              <Image source={require('../../../assets/logo.png')} style={{ width: 30, height: 30 }} resizeMode="contain" accessibilityLabel="LankaFest logo" />
             </View>
             <View style={{ marginLeft: 8 }}>
               <Text style={styles.logoTextBold}>LankaFest</Text>
               <Text style={styles.logoTextSub}>Connect</Text>
             </View>
           </View>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop' }}
-            style={styles.avatarImage}
-          />
+          <View style={[styles.avatarImage, { alignItems: 'center', justifyContent: 'center' }]}><Text>{route?.params?.user?.fullName?.slice(0, 1).toUpperCase()}</Text></View>
         </View>
 
         {/* Banner Greeting */}
         <View style={styles.banner}>
-          <Text style={styles.greetingTitle}>Welcome back,{'\n'}Event Host!</Text>
+          <Text style={styles.greetingTitle}>Welcome back,{'\n'}{route?.params?.user?.fullName || 'Event Host'}!</Text>
           <Text style={styles.greetingSubtitle}>Create amazing events{'\n'}and bring people together.</Text>
         </View>
 
@@ -146,16 +141,18 @@ export default function OrganizerDashboardScreen({ navigation, route }: Props) {
 
         {/* Recent Events Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Events</Text>
-          <TouchableOpacity onPress={() => navigation?.navigate('ManageEvent')}>
+          <Text style={styles.sectionTitle}>{route?.params?.showAll ? 'My Events' : 'Recent Events'}</Text>
+          <TouchableOpacity onPress={() => navigation?.navigate('MyEvents')}>
             <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
         </View>
 
+        {error ? <View><Text accessibilityRole="alert">{error}</Text><TouchableOpacity onPress={onRefresh}><Text style={styles.seeAllText}>Retry</Text></TouchableOpacity></View> : null}
+        {!loading && !error && !events.length ? <Text>Create your first event to see it here.</Text> : null}
         {loading ? (
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 20 }} />
         ) : (
-          events.map((item) => (
+          (route?.params?.showAll ? events : events.slice(0, 5)).map((item) => (
             <TouchableOpacity
               key={item.id || item._id}
               style={styles.eventCard}
@@ -167,7 +164,7 @@ export default function OrganizerDashboardScreen({ navigation, route }: Props) {
                   uri:
                     item.images && item.images.length > 0
                       ? item.images[0]
-                      : 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=400&auto=format&fit=crop',
+                      : undefined,
                 }}
                 style={styles.eventImage}
               />
@@ -214,76 +211,14 @@ export default function OrganizerDashboardScreen({ navigation, route }: Props) {
         activeTab="Home"
         onTabPress={(tab) => {
           if (tab === 'Profile') navigation?.navigate('Profile');
-          if (tab === 'Events') navigation?.navigate('ManageEvent');
-          if (tab === 'Messages') navigation?.navigate('EventInsights');
+          if (tab === 'Events') navigation?.navigate('EventInsights');
+          if (tab === 'Messages') navigation?.navigate('Messages');
         }}
       />
     </View>
   );
 }
 
-const defaultEvents: EventItem[] = [
-  {
-    id: 'evt_1',
-    _id: 'evt_1',
-    title: 'Kandy Esala Perahera',
-    description: 'Traditional cultural procession in Kandy.',
-    category: 'Cultural',
-    eventType: 'Physical Event',
-    audience: ['All Ages'],
-    locationName: 'Kandy Esala Perahera Ground',
-    locationAddress: 'Kandy, Sri Lanka',
-    city: 'Kandy',
-    startDate: 'Aug 10, 2025',
-    startTime: '6:00 PM',
-    endDate: 'Aug 20, 2025',
-    endTime: '11:00 PM',
-    images: ['https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=400&auto=format&fit=crop'],
-    isPaid: false,
-    additionalInfo: { foodAndBeverages: true, wheelchairAccessible: false, familyFriendly: true },
-    status: 'Upcoming',
-  },
-  {
-    id: 'evt_2',
-    _id: 'evt_2',
-    title: 'Colombo Food Festival',
-    description: 'Food stalls and cultural cuisine.',
-    category: 'Food & Drink',
-    eventType: 'Physical Event',
-    audience: ['All Ages'],
-    locationName: 'Galle Face Green',
-    locationAddress: 'Colombo 03',
-    city: 'Colombo',
-    startDate: 'Aug 25, 2025',
-    startTime: '4:00 PM',
-    endDate: 'Aug 25, 2025',
-    endTime: '10:00 PM',
-    images: ['https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=400&auto=format&fit=crop'],
-    isPaid: true,
-    additionalInfo: { foodAndBeverages: true, wheelchairAccessible: true, familyFriendly: true },
-    status: 'Upcoming',
-  },
-  {
-    id: 'evt_3',
-    _id: 'evt_3',
-    title: 'Galle Literary Festival',
-    description: 'Author readings and discussions.',
-    category: 'Arts & Festival',
-    eventType: 'Physical Event',
-    audience: ['Adults'],
-    locationName: 'Galle Fort',
-    locationAddress: 'Galle Fort, Sri Lanka',
-    city: 'Galle',
-    startDate: 'Sep 12, 2025',
-    startTime: '9:00 AM',
-    endDate: 'Sep 14, 2025',
-    endTime: '6:00 PM',
-    images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400&auto=format&fit=crop'],
-    isPaid: true,
-    additionalInfo: { foodAndBeverages: true, wheelchairAccessible: true, familyFriendly: false },
-    status: 'Draft',
-  },
-];
 
 const styles = StyleSheet.create({
   container: {

@@ -20,8 +20,9 @@ interface Props {
 }
 
 export default function ManageEventScreen({ navigation, route }: Props) {
-  const eventId = route?.params?.eventId || 'evt_1';
+  const eventId = route?.params?.eventId;
 
+  const [error, setError] = useState('');
   const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -31,10 +32,10 @@ export default function ManageEventScreen({ navigation, route }: Props) {
       if (data) {
         setEvent(data);
       } else {
-        setEvent(defaultEventDetails);
+        setEvent(null); setError('Could not load this event. Please retry.');
       }
     } catch (err) {
-      setEvent(defaultEventDetails);
+      setEvent(null);
     } finally {
       setLoading(false);
     }
@@ -50,8 +51,7 @@ export default function ManageEventScreen({ navigation, route }: Props) {
       Alert.alert('Success', 'Event duplicated successfully!');
       navigation?.navigate('OrganizerDashboard', { refreshToken: Date.now() });
     } catch (err) {
-      Alert.alert('Duplicated', 'Event copy created as Draft.');
-      navigation?.navigate('OrganizerDashboard', { refreshToken: Date.now() });
+      Alert.alert('Could not duplicate', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -68,7 +68,7 @@ export default function ManageEventScreen({ navigation, route }: Props) {
             try {
               await organizerEventService.deleteEvent(eventId);
             } catch (err) {
-              console.log('Error deleting event:', err);
+              Alert.alert('Could not delete', err instanceof Error ? err.message : 'Please try again.'); return;
             }
             Alert.alert('Event Cancelled', 'The event has been successfully cancelled.');
             navigation?.navigate('OrganizerDashboard', { refreshToken: Date.now() });
@@ -86,7 +86,8 @@ export default function ManageEventScreen({ navigation, route }: Props) {
     );
   }
 
-  const displayEvent = event || defaultEventDetails;
+  if (!event) return <View style={styles.centerContainer}><Text accessibilityRole="alert">{error}</Text><TouchableOpacity onPress={fetchEventDetails}><Text>Retry</Text></TouchableOpacity><TouchableOpacity onPress={() => navigation?.goBack()}><Text>Back to events</Text></TouchableOpacity></View>;
+  const displayEvent = event;
 
   return (
     <View style={styles.container}>
@@ -109,7 +110,7 @@ export default function ManageEventScreen({ navigation, route }: Props) {
               uri:
                 displayEvent.images && displayEvent.images.length > 0
                   ? displayEvent.images[0]
-                  : 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=800&auto=format&fit=crop',
+                  : undefined,
             }}
             style={styles.bannerImage}
           />
@@ -162,8 +163,8 @@ export default function ManageEventScreen({ navigation, route }: Props) {
           <View style={styles.detailRow}>
             <Ionicons name="people-outline" size={18} color={theme.colors.primary} style={styles.detailIcon} />
             <Text style={styles.detailText}>
-              <Text style={styles.boldText}>{displayEvent.interestedCount || '1.2K'}</Text> interested{'   '}
-              <Text style={styles.boldText}>{displayEvent.goingCount || '850'}</Text> going
+              <Text style={styles.boldText}>{displayEvent.interestedCount ?? 0}</Text> interested{'   '}
+              <Text style={styles.boldText}>{displayEvent.goingCount ?? 0}</Text> going
             </Text>
           </View>
 
@@ -219,28 +220,6 @@ export default function ManageEventScreen({ navigation, route }: Props) {
   );
 }
 
-const defaultEventDetails: EventItem = {
-  id: 'evt_1',
-  title: 'Kandy Esala Perahera',
-  description: 'The historic Kandy Esala Perahera cultural procession.',
-  category: 'Cultural',
-  eventType: 'Physical Event',
-  audience: ['All Ages'],
-  locationName: 'Kandy, Sri Lanka',
-  locationAddress: 'Kandy, Sri Lanka',
-  city: 'Kandy',
-  startDate: 'Aug 10',
-  startTime: '6:00 PM',
-  endDate: 'Aug 20, 2025',
-  endTime: '11:00 PM',
-  images: ['https://images.unsplash.com/photo-1544644181-1484b3fdfc62?q=80&w=800&auto=format&fit=crop'],
-  isPaid: false,
-  additionalInfo: { foodAndBeverages: true, wheelchairAccessible: false, familyFriendly: true },
-  status: 'Published',
-  viewsCount: 12400,
-  interestedCount: 1200,
-  goingCount: 850,
-};
 
 const styles = StyleSheet.create({
   container: {

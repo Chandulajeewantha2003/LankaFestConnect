@@ -6,7 +6,7 @@
     "start": "nest start",
     "start:dev": "nodemon",
     "build": "nest build",
-    "test": "npm run build && node --test test/auth.test.cjs"
+    "test": "npm run build && node --test test/*.test.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { organizerEventService } from '../../services/api';
+import useStepBack from './useStepBack';
 import { StepProgressBar } from './components/StepProgressBar';
 
 interface Props {
@@ -26,7 +27,10 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
 
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  const [error, setError] = useState('');
   const handlePublish = async () => {
+    if (submitting) return;
+    setError('');
     setSubmitting(true);
     try {
       if (isEditing && targetId) {
@@ -49,10 +53,11 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
     } catch (err) {
       console.log('Error publishing event:', err);
       setSubmitting(false);
-      Alert.alert('Event Saved', 'Event changes have been saved.');
-      navigation?.navigate('OrganizerDashboard', { refreshToken: Date.now() });
+      setError(err instanceof Error ? err.message : 'Could not publish your event. Please retry.');
     }
   };
+
+  useStepBack(() => navigation?.navigate('CreateEventMedia', { eventData, isEditing }));
 
   return (
     <View style={styles.container}>
@@ -76,6 +81,7 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {error ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{error}</Text> : null}
         <Text style={styles.reviewHeading}>{isEditing ? 'Review Changes' : 'Review Event Details'}</Text>
         <Text style={styles.reviewSub}>Please review all information before publishing your event.</Text>
 
@@ -86,10 +92,10 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
 
         {/* Summary Card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.eventTitle}>{eventData.title || 'Kandy Esala Perahera'}</Text>
+          <Text style={styles.eventTitle}>{eventData.title}</Text>
           <View style={styles.badgeRow}>
-            <Text style={styles.categoryBadge}>{eventData.category || 'Cultural'}</Text>
-            <Text style={styles.typeBadge}>{eventData.eventType || 'Physical Event'}</Text>
+            <Text style={styles.categoryBadge}>{eventData.category}</Text>
+            <Text style={styles.typeBadge}>{eventData.eventType}</Text>
           </View>
 
           <Text style={styles.description}>{eventData.description}</Text>
@@ -100,14 +106,14 @@ export default function CreateEventReviewScreen({ navigation, route }: Props) {
           <View style={styles.detailRow}>
             <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} style={styles.detailIcon} />
             <Text style={styles.detailText}>
-              {eventData.startDate || 'Aug 10, 2025'} - {eventData.endDate || 'Aug 20, 2025'}
+              {eventData.startDate} - {eventData.endDate}
             </Text>
           </View>
 
           <View style={styles.detailRow}>
             <Ionicons name="time-outline" size={16} color={theme.colors.primary} style={styles.detailIcon} />
             <Text style={styles.detailText}>
-              {eventData.startTime || '6:00 PM'} - {eventData.endTime || '11:00 PM'}
+              {eventData.startTime} - {eventData.endTime}
             </Text>
           </View>
 

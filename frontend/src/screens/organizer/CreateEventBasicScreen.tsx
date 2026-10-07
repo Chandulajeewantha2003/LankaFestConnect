@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import useStepBack from './useStepBack';
 import { StepProgressBar } from './components/StepProgressBar';
 
 interface Props {
@@ -64,11 +65,14 @@ export default function CreateEventBasicScreen({ navigation, route }: Props) {
 
   const isEditing = route?.params?.isEditing || !!(existingData.id || existingData._id);
 
+  const [error, setError] = useState('');
   const handleNext = () => {
+    if (!title.trim() || !description.trim() || !selectedAudience.length) { setError('Enter a title, description, and at least one audience.'); return; }
+    setError('');
     const eventData = {
       ...existingData,
-      title: title.trim() || 'Kandy Esala Perahera',
-      description: description.trim() || 'Write a detailed description about your event...',
+      title: title.trim(),
+      description: description.trim(),
       category,
       eventType,
       audience: selectedAudience.length > 0 ? selectedAudience : ['All Ages'],
@@ -76,6 +80,8 @@ export default function CreateEventBasicScreen({ navigation, route }: Props) {
 
     navigation?.navigate('CreateEventLocation', { eventData, isEditing });
   };
+
+  useStepBack(() => navigation?.goBack());
 
   return (
     <View style={styles.container}>
@@ -92,6 +98,7 @@ export default function CreateEventBasicScreen({ navigation, route }: Props) {
       <StepProgressBar currentStep={1} />
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {error ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{error}</Text> : null}
         {/* Event Title */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>

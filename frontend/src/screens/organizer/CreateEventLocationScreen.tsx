@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { parseEventDate, parseEventDateTime } from '../../utils/eventSchedule';
+import useStepBack from './useStepBack';
 import { StepProgressBar } from './components/StepProgressBar';
 
 interface Props {
@@ -31,24 +33,25 @@ const MONTH_NAMES = [
 ];
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const YEARS = [2026, 2027, 2028, 2029, 2030]; // 2026 or later only
+const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+const YEARS = Array.from({ length: 10 }, (_, i) => TODAY.getFullYear() + i);
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function CreateEventLocationScreen({ navigation, route }: Props) {
   const eventData = route?.params?.eventData || {};
 
   const [locationName, setLocationName] = useState<string>(
-    eventData.locationName || 'Kandy Esala Perahera Ground'
+    eventData.locationName || ''
   );
   const [locationAddress, setLocationAddress] = useState<string>(
-    eventData.locationAddress || 'Kandy, Sri Lanka'
+    eventData.locationAddress || ''
   );
-  const [city, setCity] = useState<string>(eventData.city || 'Kandy');
+  const [city, setCity] = useState<string>(eventData.city || '');
 
-  const [startDate, setStartDate] = useState<string>(eventData.startDate || 'Oct 15, 2026');
-  const [startTime, setStartTime] = useState<string>(eventData.startTime || '10:30 AM');
-  const [endDate, setEndDate] = useState<string>(eventData.endDate || 'Oct 20, 2026');
-  const [endTime, setEndTime] = useState<string>(eventData.endTime || '11:00 PM');
+  const [startDate, setStartDate] = useState<string>(eventData.startDate || '');
+  const [startTime, setStartTime] = useState<string>(eventData.startTime || '');
+  const [endDate, setEndDate] = useState<string>(eventData.endDate || '');
+  const [endTime, setEndTime] = useState<string>(eventData.endTime || '');
 
   // Track event signature to synchronize state when navigating into edit flow
   const lastLoadedEventRef = useRef<string>('');
@@ -67,13 +70,13 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     if (lastLoadedEventRef.current !== currentSig) {
       lastLoadedEventRef.current = currentSig;
-      if (eventData.locationName !== undefined) setLocationName(eventData.locationName || 'Kandy Esala Perahera Ground');
-      if (eventData.locationAddress !== undefined) setLocationAddress(eventData.locationAddress || 'Kandy, Sri Lanka');
-      if (eventData.city !== undefined) setCity(eventData.city || 'Kandy');
-      if (eventData.startDate !== undefined) setStartDate(eventData.startDate || 'Oct 15, 2026');
-      if (eventData.startTime !== undefined) setStartTime(eventData.startTime || '10:30 AM');
-      if (eventData.endDate !== undefined) setEndDate(eventData.endDate || 'Oct 20, 2026');
-      if (eventData.endTime !== undefined) setEndTime(eventData.endTime || '11:00 PM');
+      if (eventData.locationName !== undefined) setLocationName(eventData.locationName || '');
+      if (eventData.locationAddress !== undefined) setLocationAddress(eventData.locationAddress || '');
+      if (eventData.city !== undefined) setCity(eventData.city || '');
+      if (eventData.startDate !== undefined) setStartDate(eventData.startDate || '');
+      if (eventData.startTime !== undefined) setStartTime(eventData.startTime || '');
+      if (eventData.endDate !== undefined) setEndDate(eventData.endDate || '');
+      if (eventData.endTime !== undefined) setEndTime(eventData.endTime || '');
     }
   }, [route?.params?.eventData]);
 
@@ -81,10 +84,15 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   const [activePicker, setActivePicker] = useState<'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
 
   // Calendar State (Current baseline: October 2026)
-  const [calMonth, setCalMonth] = useState<number>(9); // 0-indexed (9 = October)
-  const [calYear, setCalYear] = useState<number>(2026);
-  const [calDay, setCalDay] = useState<number>(15);
+  const [calMonth, setCalMonth] = useState<number>(TODAY.getMonth()); // 0-indexed (9 = October)
+  const [calYear, setCalYear] = useState<number>(TODAY.getFullYear());
+  const [calDay, setCalDay] = useState<number>(TODAY.getDate());
   const [showYearDropdown, setShowYearDropdown] = useState<boolean>(false);
+  useEffect(() => {
+    const max = new Date(calYear, calMonth + 1, 0).getDate();
+    const min = calYear === TODAY.getFullYear() && calMonth === TODAY.getMonth() ? TODAY.getDate() : 1;
+    setCalDay(day => Math.max(min, Math.min(day, max)));
+  }, [calMonth, calYear]);
 
   // Time Picker State (12-hour format with UP/DOWN arrows)
   const [timeHour, setTimeHour] = useState<number>(10);
@@ -95,13 +103,13 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   const openDatePicker = (type: 'startDate' | 'endDate') => {
     setActivePicker(type);
     const targetStr = type === 'startDate' ? startDate : endDate;
-    let year = 2026;
-    let month = 9; // October (0-indexed)
-    let day = 6;
+    let year = TODAY.getFullYear();
+    let month = TODAY.getMonth();
+    let day = TODAY.getDate();
 
     if (targetStr) {
-      const parsed = new Date(targetStr);
-      if (!isNaN(parsed.getTime())) {
+      const parsed = parseEventDate(targetStr);
+      if (parsed) {
         year = parsed.getFullYear();
         month = parsed.getMonth();
         day = parsed.getDate();
@@ -118,17 +126,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
       }
     }
 
-    // Enforce October 6 2026 minimum constraint
-    if (year < 2026) {
-      year = 2026;
-      month = 9;
-      day = 6;
-    } else if (year === 2026 && month < 9) {
-      month = 9;
-      day = 6;
-    } else if (year === 2026 && month === 9 && day < 6) {
-      day = 6;
-    }
+    if (new Date(year, month, day) < TODAY) { year = TODAY.getFullYear(); month = TODAY.getMonth(); day = TODAY.getDate(); }
 
     setCalYear(year);
     setCalMonth(month);
@@ -164,7 +162,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   };
 
   // Calendar logic with month constraint (Cannot navigate before Oct 2026)
-  const canGoPrevMonth = calYear > 2026 || (calYear === 2026 && calMonth > 9);
+  const canGoPrevMonth = calYear > TODAY.getFullYear() || (calYear === TODAY.getFullYear() && calMonth > TODAY.getMonth());
 
   const handlePrevMonth = () => {
     if (!canGoPrevMonth) return;
@@ -186,6 +184,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   };
 
   const applyDateSelection = () => {
+    if (calDay > new Date(calYear, calMonth + 1, 0).getDate() || new Date(calYear, calMonth, calDay) < TODAY) return;
     const formattedMonth = SHORT_MONTHS[calMonth];
     const formattedDate = `${formattedMonth} ${calDay}, ${calYear}`;
     if (activePicker === 'startDate') setStartDate(formattedDate);
@@ -223,16 +222,21 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
   const getUpdatedEventData = () => ({
     ...eventData,
-    locationName,
-    locationAddress,
-    city,
+    locationName: locationName.trim(),
+    locationAddress: locationAddress.trim(),
+    city: city.trim(),
     startDate,
     startTime,
     endDate,
     endTime,
   });
 
+  const [error, setError] = useState('');
   const handleNext = () => {
+    if (![locationName, locationAddress, city, startDate, startTime, endDate, endTime].every(v => v.trim())) { setError('Enter the venue, address, city, and start and end schedule.'); return; }
+    const start = parseEventDateTime(startDate, startTime), end = parseEventDateTime(endDate, endTime);
+    if (!start || !end || end <= start) { setError('Choose an end date and time after the start.'); return; }
+    setError('');
     navigation?.navigate('CreateEventMedia', { eventData: getUpdatedEventData(), isEditing });
   };
 
@@ -250,10 +254,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     // Days 1..daysInMonth
     for (let d = 1; d <= daysInMonth; d++) {
-      const isPastDay =
-        calYear < 2026 ||
-        (calYear === 2026 && calMonth < 9) ||
-        (calYear === 2026 && calMonth === 9 && d < 6); // Before Oct 6, 2026 is past/unavailable
+      const isPastDay = new Date(calYear, calMonth, d) < TODAY;
 
       const isSelected = calDay === d && !isPastDay;
 
@@ -283,6 +284,8 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     return cells;
   };
+
+  useStepBack(() => navigation?.navigate('CreateEventBasic', { eventData: getUpdatedEventData(), isEditing }));
 
   return (
     <View style={styles.container}>
@@ -334,10 +337,12 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
                 value={locationAddress}
                 onChangeText={(val) => {
                   setLocationAddress(val);
-                  if (val.includes(',')) setCity(val.split(',')[0].trim());
+
                 }}
                 placeholder="Address"
               />
+              <Text style={styles.fieldLabel}>City *</Text>
+              <TextInput accessibilityLabel="Event city" style={styles.locationSubInput} value={city} onChangeText={setCity} placeholder="Enter city" />
             </View>
           </View>
 
@@ -364,7 +369,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.fieldLabel}>Start Date</Text>
               <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
-                <Text style={styles.flexInputText}>{startDate}</Text>
+                <Text style={styles.flexInputText}>{startDate || 'Select start date'}</Text>
               </View>
             </TouchableOpacity>
 
@@ -372,7 +377,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.fieldLabel}>Start Time</Text>
               <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="time-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
-                <Text style={styles.flexInputText}>{startTime}</Text>
+                <Text style={styles.flexInputText}>{startTime || 'Select start time'}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -383,7 +388,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.fieldLabel}>End Date</Text>
               <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
-                <Text style={styles.flexInputText}>{endDate}</Text>
+                <Text style={styles.flexInputText}>{endDate || 'Select end date'}</Text>
               </View>
             </TouchableOpacity>
 
@@ -391,7 +396,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <Text style={styles.fieldLabel}>End Time</Text>
               <View style={styles.inputWithIcon} pointerEvents="none">
                 <Ionicons name="time-outline" size={16} color={theme.colors.primary} style={styles.inputIcon} />
-                <Text style={styles.flexInputText}>{endTime}</Text>
+                <Text style={styles.flexInputText}>{endTime || 'Select end time'}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -486,7 +491,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
                       style={[styles.yearPill, calYear === y && styles.yearPillSelected]}
                       onPress={() => {
                         setCalYear(y);
-                        if (y === 2026 && calMonth < 9) setCalMonth(9); // Clamp to Oct 2026 minimum
+                        if (y === TODAY.getFullYear() && calMonth < TODAY.getMonth()) setCalMonth(TODAY.getMonth());
                         setShowYearDropdown(false);
                       }}
                     >
@@ -589,6 +594,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
       {/* Footer Next Button */}
       <View style={styles.footer}>
+        {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.colors.danger, marginBottom: 10 }}>{error}</Text> : null}
         <TouchableOpacity style={styles.nextButton} activeOpacity={0.85} onPress={handleNext}>
           <Text style={styles.nextButtonText}>Next</Text>
         </TouchableOpacity>
@@ -882,15 +888,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   calendarDayCell: {
-    width: 38,
+    width: '14.2857%',
     height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 3,
+    marginVertical: 3,
     borderRadius: 19,
   },
   calendarDayCellEmpty: {
-    width: 38,
+    width: '14.2857%',
     height: 38,
     margin: 3,
   },
