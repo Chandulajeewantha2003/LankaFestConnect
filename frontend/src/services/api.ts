@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { UserRole } from '../types';
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? (Platform.OS === 'android' ? 'http://10.0.2.2:3000/api' : 'http://localhost:3000/api');
 export interface User { id: string; fullName: string; email: string; role: UserRole | null; authorityApproved: boolean; }
 export interface Session { token: string; user: User; }
 let token: string | null = null;
@@ -32,3 +32,38 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   throw error;
  } finally { clearTimeout(timeout); }
 }
+
+// Organizer Event API Service helpers
+export const organizerEventService = {
+  getEvents: async () => {
+    return apiRequest<any[]>('/organizer/events');
+  },
+  getEventById: async (id: string) => {
+    return apiRequest<any>(`/events/${id}`);
+  },
+  createEvent: async (data: any) => {
+    return apiRequest<any>('/events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateEvent: async (id: string, data: any) => {
+    return apiRequest<any>(`/events/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteEvent: async (id: string) => {
+    return apiRequest<any>(`/events/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  duplicateEvent: async (id: string) => {
+    return apiRequest<any>(`/events/${id}/duplicate`, {
+      method: 'POST',
+    });
+  },
+  getEventInsights: async (id: string) => {
+    return apiRequest<any>(`/events/${id}/insights`);
+  },
+};

@@ -1,0 +1,62 @@
+import React, { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { View, Button } from 'react-native';
+import { User } from '../services/api';
+import OrganizerAccountScreen from '../screens/organizer/OrganizerAccountScreen';
+import OrganizerDashboardScreen from '../screens/organizer/OrganizerDashboardScreen';
+import CreateEventBasicScreen from '../screens/organizer/CreateEventBasicScreen';
+import CreateEventLocationScreen from '../screens/organizer/CreateEventLocationScreen';
+import CreateEventMediaScreen from '../screens/organizer/CreateEventMediaScreen';
+import CreateEventReviewScreen from '../screens/organizer/CreateEventReviewScreen';
+import ManageEventScreen from '../screens/organizer/ManageEventScreen';
+import EventInsightsScreen from '../screens/organizer/EventInsightsScreen';
+
+export default function OrganizerNavigator({ user, logout }: { user: User; logout: () => void }) {
+  const [currentScreen, setCurrentScreen] = useState<string>('OrganizerDashboard');
+  const [screenParams, setScreenParams] = useState<any>({});
+
+  const navigation = {
+    navigate: (screenName: string, params?: any) => {
+      if (params) setScreenParams(params);
+      setCurrentScreen(screenName);
+    },
+    goBack: () => {
+      if (currentScreen === 'CreateEventLocation') setCurrentScreen('CreateEventBasic');
+      else if (currentScreen === 'CreateEventMedia') setCurrentScreen('CreateEventLocation');
+      else if (currentScreen === 'CreateEventReview') setCurrentScreen('CreateEventMedia');
+      else if (currentScreen === 'ManageEvent' || currentScreen === 'EventInsights') setCurrentScreen('OrganizerDashboard');
+      else setCurrentScreen('OrganizerDashboard');
+    },
+  };
+
+  const route = { params: screenParams };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'CreateEventBasic':
+        return <CreateEventBasicScreen navigation={navigation} route={route} />;
+      case 'CreateEventLocation':
+        return <CreateEventLocationScreen navigation={navigation} route={route} />;
+      case 'CreateEventMedia':
+        return <CreateEventMediaScreen navigation={navigation} route={route} />;
+      case 'CreateEventReview':
+        return <CreateEventReviewScreen navigation={navigation} route={route} />;
+      case 'ManageEvent':
+        return <ManageEventScreen navigation={navigation} route={route} />;
+      case 'EventInsights':
+        return <EventInsightsScreen navigation={navigation} route={route} />;
+      case 'Profile':
+        return <View style={{ flex: 1 }}><Button title="Back to events" onPress={() => setCurrentScreen('OrganizerDashboard')} /><OrganizerAccountScreen user={user} logout={logout} /></View>;
+      case 'OrganizerDashboard':
+      default:
+        return <OrganizerDashboardScreen navigation={navigation} route={route} />;
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+
+      {renderScreen()}
+    </View>
+  );
+}
