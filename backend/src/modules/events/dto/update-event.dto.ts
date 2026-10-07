@@ -22,6 +22,7 @@ export class UpdateEventDto {
   @IsArray()
   audience?: string[];
 
+
   @IsOptional()
   @IsString()
   locationName?: string;
