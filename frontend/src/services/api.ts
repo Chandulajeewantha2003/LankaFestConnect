@@ -50,7 +50,7 @@ export const organizerEventService = {
   updateEvent: async (id: string, data: any) => {
     return apiRequest<any>(`/events/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: JSON.stringify(eventPayload(data)),
     });
   },
   deleteEvent: async (id: string) => {
