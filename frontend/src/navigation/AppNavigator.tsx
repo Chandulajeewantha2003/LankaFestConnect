@@ -9,7 +9,7 @@ import RegistrationScreen from '../screens/welcome/registration/RegistrationScre
 import RoleSelectionScreen from '../screens/welcome/role/RoleSelectionScreen';
 import HomeScreen from '../screens/event-seeker/HomeScreen';
 import OrganizerNavigator from './OrganizerNavigator';
-import AuthorityDashboardScreen from '../screens/authority/AuthorityDashboardScreen';
+import AuthorityNavigator from './AuthorityNavigator';
 export default function AppNavigator() {
  const [route, setRoute] = useState<'welcome' | 'login' | 'registration'>('welcome');
  const [user, setUser] = useState<User | null>(null), [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ export default function AppNavigator() {
  if (loading) screen = <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color="#0B7A3E"/><Text>Loading your account…</Text></View>;
  else if (user && !user.role) screen = <RoleSelectionScreen onSession={onSession} logout={logout}/>;
  else if (user) {
-  const Dashboard = { SEEKER: HomeScreen, ORGANIZER: OrganizerNavigator, AUTHORITY: AuthorityDashboardScreen }[user.role!];
+  const Dashboard = { SEEKER: HomeScreen, ORGANIZER: OrganizerNavigator, AUTHORITY: AuthorityNavigator }[user.role!];
   screen = <Dashboard user={user} logout={logout}/>;
  } else if (route === 'welcome') screen = <WelcomeScreen onStart={() => setRoute('login')}/>;
  else if (route === 'login') screen = <LoginScreen back={() => setRoute('welcome')} signUp={() => setRoute('registration')} onSession={onSession}/>;
