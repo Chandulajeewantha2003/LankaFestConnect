@@ -10,6 +10,8 @@ export class UpdateEventDto {
   description?: string;
 
 
+
+
   @IsOptional()
   @IsString()
   category?: string;
