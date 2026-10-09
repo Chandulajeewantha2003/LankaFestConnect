@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  Image,
   ImageBackground,
   RefreshControl,
   ScrollView,
@@ -13,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { User } from '../../services/api';
-import { AuthorityDashboard, authorityService } from '../../services/authority';
+import { AuthorityDashboard, authorityService, OfficerDetails } from '../../services/authority';
 import AuthorityHeader, { AuthorityScreen } from './components/AuthorityHeader';
 
 export type { AuthorityScreen };
@@ -33,6 +34,7 @@ export default function AuthorityDashboardScreen({ user, onNavigate, logout }: P
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [officer, setOfficer] = useState<OfficerDetails | null>(null);
   const active = useRef(true);
   const busy = useRef(false);
 
@@ -56,6 +58,20 @@ export default function AuthorityDashboardScreen({ user, onNavigate, logout }: P
         setSyncing(false);
       }
     }
+  }, []);
+
+  // Officer photo and region are optional; the card falls back to initials if they cannot load.
+  useEffect(() => {
+    let mounted = true;
+    authorityService
+      .getProfile()
+      .then((data) => {
+        if (mounted) setOfficer(data.profile);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Live sync: refresh periodically and whenever the app returns to the foreground.
@@ -196,7 +212,11 @@ export default function AuthorityDashboardScreen({ user, onNavigate, logout }: P
         {/* Officer card */}
         <View style={styles.officerCard}>
           <View style={styles.officerAvatar}>
-            <Text style={styles.officerInitial}>{firstName.slice(0, 1).toUpperCase()}</Text>
+            {officer?.photo ? (
+              <Image source={{ uri: officer.photo }} style={styles.officerPhoto} accessibilityLabel="Your profile photo" />
+            ) : (
+              <Text style={styles.officerInitial}>{firstName.slice(0, 1).toUpperCase()}</Text>
+            )}
             <View style={styles.onlineDot} />
           </View>
           <View style={styles.officerInfo}>
@@ -204,8 +224,8 @@ export default function AuthorityDashboardScreen({ user, onNavigate, logout }: P
               <Text style={styles.helloText} numberOfLines={1}>Hello, {firstName}</Text>
               <Text style={styles.onlinePill}>Online</Text>
             </View>
-            <Text style={styles.officerTitle}>Tourism Officer</Text>
-            <Text style={styles.officerMeta}>Tourism Authority • Sri Lanka</Text>
+            <Text style={styles.officerTitle} numberOfLines={1}>{officer?.designation ?? 'Tourism Officer'}</Text>
+            <Text style={styles.officerMeta}>Tourism Authority • {officer?.region ?? 'Sri Lanka'}</Text>
           </View>
           <TouchableOpacity accessibilityLabel="View officer profile" onPress={() => onNavigate('Profile')} style={styles.idButton}>
             <Ionicons name="id-card-outline" size={22} color={theme.colors.primary} />
@@ -343,6 +363,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  officerPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   officerInitial: {
     fontSize: 24,

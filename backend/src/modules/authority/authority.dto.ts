@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsMongoId, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { REPORT_CATEGORIES, REPORT_PRIORITIES, REPORT_STATUSES, ReportCategory, ReportPriority, ReportSource, ReportStatus } from '../reports/report.schema';
 import { ALERT_AUDIENCES, ALERT_CLASSIFICATIONS, ALERT_TYPES, AlertAudience, AlertClassification, AlertType } from '../alerts/alert.schema';
+import { OFFICER_REGIONS, OfficerRegion } from './officer-profile.schema';
 const OFFICER_SOURCES: ReportSource[] = ['FIELD_OFFICER', 'LOCAL_POLICE', 'PUBLIC_TIP'];
 import { VERIFICATION_STATUSES, VerificationStatus } from '../verifications/verification.schema';
 import { LISTING_STATUSES, ListingStatus } from './authority.service';
@@ -43,4 +44,13 @@ export class PublishAlertDto {
  @IsIn(ALERT_CLASSIFICATIONS) classification!: AlertClassification;
  @IsBoolean() urgent!: boolean;
  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(ALERT_AUDIENCES.length) @IsIn(ALERT_AUDIENCES, { each: true }) audiences!: AlertAudience[];
+}
+export const PROFILE_PHOTO_LENGTH = 400000;
+export class UpdateProfileDto {
+ @IsOptional() @IsString() @MaxLength(60) designation?: string;
+ @IsOptional() @IsIn(OFFICER_REGIONS) region?: OfficerRegion;
+ @IsOptional() @IsString() @Matches(/^(\+?[0-9][0-9 ]{6,18})?$/, { message: 'Enter a valid phone number (digits, spaces and an optional leading +).' }) officePhone?: string;
+}
+export class ProfilePhotoDto {
+ @IsString() @MaxLength(PROFILE_PHOTO_LENGTH, { message: 'That photo is too large. Please choose a smaller image.' }) @Matches(EVIDENCE_PATTERN, { message: 'Profile photo must be a JPEG, PNG or WebP image.' }) photo!: string;
 }

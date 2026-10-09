@@ -148,6 +148,34 @@ export interface NewAlert {
   audiences: AlertAudience[];
 }
 
+export const OFFICER_REGIONS = [
+  'Island-wide', 'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara', 'Kandy', 'Kegalle',
+  'Kilinochchi', 'Kurunegala', 'Mannar', 'Matale', 'Matara', 'Monaragala', 'Mullaitivu', 'Nuwara Eliya', 'Polonnaruwa', 'Puttalam', 'Ratnapura', 'Trincomalee', 'Vavuniya',
+] as const;
+export type OfficerRegion = (typeof OFFICER_REGIONS)[number];
+
+export interface OfficerDetails {
+  designation: string;
+  region: OfficerRegion;
+  officePhone: string;
+  photo: string | null;
+}
+
+export interface OfficerProfile {
+  account: { id: string; fullName: string; email: string; authorityApproved: boolean; memberSince: string | null };
+  profile: OfficerDetails;
+  activity: {
+    eventsVerified: number;
+    eventsRejected: number;
+    eventsFlagged: number;
+    reportsFiled: number;
+    reportsResolved: number;
+    alertsPublished: number;
+    alertsActive: number;
+  };
+  recentDecisions: { eventId: string; eventTitle: string; status: DecisionStatus; decidedAt: string }[];
+}
+
 export const authorityService = {
   getDashboard: async () => {
     return apiRequest<AuthorityDashboard>('/authority/dashboard');
@@ -205,6 +233,26 @@ export const authorityService = {
   withdrawAlert: async (id: string) => {
     return apiRequest<PublicAlert>(`/authority/alerts/${encodeURIComponent(id)}/withdraw`, {
       method: 'PATCH',
+    });
+  },
+  getProfile: async () => {
+    return apiRequest<OfficerProfile>('/authority/profile');
+  },
+  updateProfile: async (data: Partial<Pick<OfficerDetails, 'designation' | 'region' | 'officePhone'>>) => {
+    return apiRequest<OfficerDetails>('/authority/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  setProfilePhoto: async (photo: string) => {
+    return apiRequest<OfficerDetails>('/authority/profile/photo', {
+      method: 'PUT',
+      body: JSON.stringify({ photo }),
+    });
+  },
+  removeProfilePhoto: async () => {
+    return apiRequest<OfficerDetails>('/authority/profile/photo', {
+      method: 'DELETE',
     });
   },
 };

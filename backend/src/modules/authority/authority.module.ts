@@ -13,9 +13,12 @@ import { AuthorityReportsController } from './authority-reports.controller';
 import { AuthorityReportsService } from './authority-reports.service';
 import { AuthorityAlertsController } from './authority-alerts.controller';
 import { AuthorityAlertsService } from './authority-alerts.service';
+import { AuthorityProfileController } from './authority-profile.controller';
+import { AuthorityProfileService } from './authority-profile.service';
+import { OfficerProfile, OfficerProfileSchema } from './officer-profile.schema';
 // Events are only read here; organizer-owned event data is never modified by this module.
 @Module({
- imports: [AuthModule, UsersModule, VerificationsModule, ReportsModule, AlertsModule, MongooseModule.forFeature([{ name: Event.name, schema: EventSchema }])],
- controllers: [AuthorityController, AuthorityReportsController, AuthorityAlertsController], providers: [AuthorityService, AuthorityReportsService, AuthorityAlertsService, AuthorityGuard],
+ imports: [AuthModule, UsersModule, VerificationsModule, ReportsModule, AlertsModule, MongooseModule.forFeature([{ name: Event.name, schema: EventSchema }, { name: OfficerProfile.name, schema: OfficerProfileSchema }])],
+ controllers: [AuthorityController, AuthorityReportsController, AuthorityAlertsController, AuthorityProfileController], providers: [AuthorityService, AuthorityReportsService, AuthorityAlertsService, AuthorityProfileService, AuthorityGuard],
 })
 export class AuthorityModule {}
