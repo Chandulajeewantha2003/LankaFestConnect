@@ -67,3 +67,16 @@ test('views and saves are unique per seeker and unsaving reduces interested coun
  assert.equal(service.normalize({ toObject: () => row }).viewerIds, undefined);
  assert.equal(service.normalize({ toObject: () => row }).savedByIds, undefined);
 });
+
+test('update validation accepts editable fields and partial updates, rejects invalid values and metadata', async () => {
+ const { ValidationPipe } = require('@nestjs/common');
+ const { UpdateEventDto } = require('../dist/modules/events/dto/update-event.dto');
+ const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+ const metadata = { type: 'body', metatype: UpdateEventDto };
+ const valid = { ...base, eventType: 'Physical Event', audience: ['All Ages'], images: [], isPaid: true, ticketPrice: 1200, additionalInfo: { familyFriendly: true } };
+ assert.equal((await pipe.transform(valid, metadata)).title, base.title);
+ assert.equal((await pipe.transform({ title: 'Edited title' }, metadata)).title, 'Edited title');
+ await assert.rejects(pipe.transform({ title: 123 }, metadata));
+ await assert.rejects(pipe.transform({ ticketPrice: 'invalid' }, metadata));
+ await assert.rejects(pipe.transform({ ...valid, _id: 'server-id', viewsCount: 10, organizer: {} }, metadata));
+});
