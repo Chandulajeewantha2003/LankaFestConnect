@@ -5,6 +5,11 @@ export type EventDocument = Event & Document;
 
 @Schema({ timestamps: true })
 export class Event {
+  @Prop() mapsUrl?: string;
+  @Prop() placeId?: string;
+  @Prop({ min: -90, max: 90 }) latitude?: number;
+  @Prop({ min: -180, max: 180 }) longitude?: number;
+
   @Prop({ type: [String], default: [], select: false }) viewerIds!: string[];
   @Prop({ type: [String], default: [], select: false }) savedByIds!: string[];
   @Prop({ required: true })

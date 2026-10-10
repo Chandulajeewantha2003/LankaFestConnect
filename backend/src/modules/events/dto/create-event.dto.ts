@@ -1,6 +1,13 @@
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsUrl, Matches, MaxLength, IsBoolean, IsNumber, Min, Max, IsOptional, IsString } from 'class-validator';
 
 export class CreateEventDto {
+  @IsOptional() @IsUrl({ protocols: ['https'], require_protocol: true }) @MaxLength(2048)
+  @Matches(/^https:\/\/(?:(?:www\.)?google\.com\/maps(?:[/?#]|$)|maps\.google\.com(?:[/?#]|$)|maps\.app\.goo\.gl\/[^\s]+|goo\.gl\/maps\/[^\s]+)/i)
+  mapsUrl?: string;
+  @IsOptional() @IsString() placeId?: string;
+  @IsOptional() @IsNumber() @Min(-90) @Max(90) latitude?: number;
+  @IsOptional() @IsNumber() @Min(-180) @Max(180) longitude?: number;
+
   @IsString()
   title!: string;
 

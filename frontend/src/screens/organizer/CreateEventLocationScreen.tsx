@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import PlaceMap from '../../components/PlaceMap';
+import { PlaceResult, searchPlaces } from '../../services/places';
 import { theme } from '../../constants/theme';
 import { parseEventDate, parseEventDateTime } from '../../utils/eventSchedule';
 import useStepBack from './useStepBack';
@@ -18,14 +21,6 @@ interface Props {
   navigation?: any;
   route?: any;
 }
-
-const PRESET_LOCATIONS = [
-  { name: 'Kandy Esala Perahera Ground', address: 'Kandy, Sri Lanka', city: 'Kandy' },
-  { name: 'Galle Face Green', address: 'Colombo 03, Sri Lanka', city: 'Colombo' },
-  { name: 'Galle Fort Cultural Center', address: 'Galle Fort, Sri Lanka', city: 'Galle' },
-  { name: 'Jaffna Cultural Center', address: 'Jaffna, Sri Lanka', city: 'Jaffna' },
-  { name: 'Negombo Beach Park', address: 'Negombo, Sri Lanka', city: 'Negombo' },
-];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -47,6 +42,15 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
     eventData.locationAddress || ''
   );
   const [city, setCity] = useState<string>(eventData.city || '');
+  const [place, setPlace] = useState<{ placeId?: string; latitude?: number; longitude?: number }>({ placeId: eventData.placeId, latitude: eventData.latitude, longitude: eventData.longitude });
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchVersion = useRef(0);
+
+  const [mapsUrl, setMapsUrl] = useState<string>(eventData.mapsUrl || '');
+  const [pinDraft, setPinDraft] = useState<{ latitude?: number; longitude?: number }>({});
+  const [searchError, setSearchError] = useState('');
 
   const [startDate, setStartDate] = useState<string>(eventData.startDate || '');
   const [startTime, setStartTime] = useState<string>(eventData.startTime || '');
@@ -62,6 +66,8 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
       locationName: eventData.locationName,
       locationAddress: eventData.locationAddress,
       city: eventData.city,
+      mapsUrl: eventData.mapsUrl,
+      placeId: eventData.placeId, latitude: eventData.latitude, longitude: eventData.longitude,
       startDate: eventData.startDate,
       startTime: eventData.startTime,
       endDate: eventData.endDate,
@@ -70,6 +76,8 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
     if (lastLoadedEventRef.current !== currentSig) {
       lastLoadedEventRef.current = currentSig;
+      setMapsUrl(eventData.mapsUrl || '');
+      setPlace({ placeId: eventData.placeId, latitude: eventData.latitude, longitude: eventData.longitude });
       if (eventData.locationName !== undefined) setLocationName(eventData.locationName || '');
       if (eventData.locationAddress !== undefined) setLocationAddress(eventData.locationAddress || '');
       if (eventData.city !== undefined) setCity(eventData.city || '');
@@ -82,6 +90,33 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
   // Modal pickers state
   const [activePicker, setActivePicker] = useState<'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
+
+  const runSearch = async () => {
+    if (query.trim().length < 3 || searching) return;
+    const version = ++searchVersion.current;
+    setSearching(true); setSearchError(''); setResults([]);
+    try {
+      const found = await searchPlaces(query.trim());
+      if (version !== searchVersion.current) return;
+      setResults(found);
+      if (!found.length) setSearchError('No venues found. Try a more specific name or address.');
+    } catch (err) {
+      if (version === searchVersion.current) setSearchError(err instanceof Error ? err.message : 'Search failed. Please try again.');
+    } finally { if (version === searchVersion.current) setSearching(false); }
+  };
+  useEffect(() => () => { searchVersion.current++; }, []);
+  const selectPlace = (result: PlaceResult) => {
+    searchVersion.current++; setSearching(false);
+    setLocationName(result.name); setLocationAddress(result.address); setCity(result.city);
+    setPlace({ placeId: result.placeId, latitude: result.latitude, longitude: result.longitude });
+    setMapsUrl(''); setError(''); setSearchError(''); setActivePicker(null);
+  };
+
+  const savePin = () => {
+    if (!Number.isFinite(pinDraft.latitude) || !Number.isFinite(pinDraft.longitude)) { setSearchError('Tap the map to choose the venue pin.'); return; }
+    setPlace({ latitude: pinDraft.latitude, longitude: pinDraft.longitude, placeId: undefined });
+    setMapsUrl(''); setError(''); setSearchError(''); setActivePicker(null);
+  };
 
   // Calendar State (Current baseline: October 2026)
   const [calMonth, setCalMonth] = useState<number>(TODAY.getMonth()); // 0-indexed (9 = October)
@@ -222,6 +257,10 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 
   const getUpdatedEventData = () => ({
     ...eventData,
+    placeId: place.placeId ?? null,
+    latitude: place.latitude ?? null,
+    longitude: place.longitude ?? null,
+    mapsUrl: mapsUrl || null,
     locationName: locationName.trim(),
     locationAddress: locationAddress.trim(),
     city: city.trim(),
@@ -234,6 +273,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
   const [error, setError] = useState('');
   const handleNext = () => {
     if (![locationName, locationAddress, city, startDate, startTime, endDate, endTime].every(v => v.trim())) { setError('Enter the venue, address, city, and start and end schedule.'); return; }
+    if ((!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) && !isEditing) { setError('Search for a venue or select its pin on the map.'); return; }
     const start = parseEventDateTime(startDate, startTime), end = parseEventDateTime(endDate, endTime);
     if (!start || !end || end <= start) { setError('Choose an end date and time after the start.'); return; }
     setError('');
@@ -308,18 +348,8 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
         <Text style={styles.sectionTitle}>Event Location</Text>
 
         <View style={styles.mapCard}>
-          {/* Visual Map Graphic */}
           <View style={styles.mapVisualContainer}>
-            <View style={styles.mapWaterArea} />
-            <View style={styles.mapRoad1} />
-            <View style={styles.mapRoad2} />
-            <Text style={styles.mapLabelLake}>Kandy Lake</Text>
-            <Text style={styles.mapLabelTemple}>Temple of the Tooth</Text>
-            <Text style={styles.mapLabelCentre}>Kandy City Centre</Text>
-            {/* Map Marker Pin */}
-            <View style={styles.mapMarkerPin}>
-              <Ionicons name="location" size={28} color={theme.colors.danger} />
-            </View>
+            <PlaceMap mapsUrl={mapsUrl} venue={locationName} address={locationAddress} city={city} {...place} />
           </View>
 
           {/* Location info box */}
@@ -335,10 +365,7 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
               <TextInput
                 style={styles.locationSubInput}
                 value={locationAddress}
-                onChangeText={(val) => {
-                  setLocationAddress(val);
-
-                }}
+                onChangeText={setLocationAddress}
                 placeholder="Address"
               />
               <Text style={styles.fieldLabel}>City *</Text>
@@ -350,11 +377,11 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
           <TouchableOpacity
             style={styles.changeLocationButton}
             activeOpacity={0.7}
-            onPress={() => setActivePicker('location')}
+            onPress={() => { setPinDraft({ latitude: place.latitude, longitude: place.longitude }); setResults([]); setSearchError(''); setActivePicker('location'); }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }} pointerEvents="none">
               <Ionicons name="map-outline" size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.changeLocationText}>Change Location</Text>
+              <Text style={styles.changeLocationText}>{Number.isFinite(place.latitude) && Number.isFinite(place.longitude) ? 'Change Location' : 'Search for a venue'}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -416,27 +443,27 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
             activeOpacity={1}
             onPress={() => setActivePicker(null)}
           />
-          <View style={styles.modalContent}>
+          <ScrollView style={[styles.modalContent, { maxHeight: '85%' }]} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
             <Text style={styles.modalTitle}>Select Event Location</Text>
-            {PRESET_LOCATIONS.map((loc) => (
-              <TouchableOpacity
-                key={loc.name}
-                style={styles.locationPresetItem}
-                onPress={() => {
-                  setLocationName(loc.name);
-                  setLocationAddress(loc.address);
-                  setCity(loc.city);
-                  setActivePicker(null);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="location-outline" size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={styles.presetName}>{loc.name}</Text>
-                </View>
-                <Text style={styles.presetAddress}>{loc.address}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            <Text style={styles.presetAddress}>Find a venue in Sri Lanka. Select a result to save its address and exact map location.</Text>
+            <TextInput accessibilityLabel="Venue search" placeholder="e.g. Galle Fort, Sri Lanka" maxLength={200} value={query}
+              onChangeText={value => { searchVersion.current++; setSearching(false); setQuery(value); setResults([]); setSearchError(''); }}
+              style={[styles.searchInput, { marginTop: 12 }]} returnKeyType="search" onSubmitEditing={runSearch} />
+            <TouchableOpacity style={[styles.applyButton, (searching || query.trim().length < 3) && { opacity: 0.55 }]}
+              disabled={searching || query.trim().length < 3} onPress={runSearch} accessibilityRole="button">
+              {searching ? <ActivityIndicator color="#fff" /> : <Text style={styles.applyButtonText}>Search places</Text>}
+            </TouchableOpacity>
+            {results.map(result => <TouchableOpacity key={result.id} style={styles.locationPresetItem} onPress={() => selectPlace(result)} accessibilityRole="button">
+              <Text style={styles.presetName}>{result.name}</Text><Text style={styles.presetAddress}>{result.address}</Text>
+            </TouchableOpacity>)}
+            {searchError ? <Text accessibilityRole="alert" style={styles.searchError}>{searchError}</Text> : null}
+            <Text style={[styles.presetAddress, { marginTop: 16 }]}>Cannot find your venue? Zoom in, tap the map or drag the pin to its exact location.</Text>
+            <View style={{ height: 260, marginTop: 12 }}><PlaceMap latitude={pinDraft.latitude} longitude={pinDraft.longitude} selectable onSelect={setPinDraft} /></View>
+            <TouchableOpacity style={styles.applyButton} onPress={savePin} accessibilityRole="button"><Text style={styles.applyButtonText}>Use this pin</Text></TouchableOpacity>
+            <Text style={[styles.presetAddress, { marginTop: 12 }]}>For a manually selected pin, enter or update the venue name, address and city on the form.</Text>
+            <Text style={[styles.presetAddress, { marginTop: 12 }]}>Search data: OpenStreetMap contributors</Text>
+            <TouchableOpacity onPress={() => setActivePicker(null)} style={{ paddingTop: 16 }}><Text style={styles.changeLocationText}>Close</Text></TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -604,6 +631,8 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
 }
 
 const styles = StyleSheet.create({
+  searchInput: { borderWidth: 1, borderColor: '#CBD5CF', borderRadius: 8, padding: 12, fontSize: 14 },
+  searchError: { color: theme.colors.danger, marginVertical: 12 },
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
@@ -644,61 +673,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mapVisualContainer: {
-    height: 145,
+    height: 220,
     backgroundColor: '#E0F2FE',
+    width: '100%',
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  mapWaterArea: {
-    position: 'absolute',
-    right: -10,
-    top: 5,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: '#BAE6FD',
-  },
-  mapRoad1: {
-    position: 'absolute',
-    width: '100%',
-    height: 6,
-    backgroundColor: '#FFFFFF',
-    transform: [{ rotate: '-15deg' }],
-  },
-  mapRoad2: {
-    position: 'absolute',
-    height: '100%',
-    width: 6,
-    backgroundColor: '#FFFFFF',
-    left: '42%',
-  },
-  mapLabelLake: {
-    position: 'absolute',
-    right: 25,
-    top: 25,
-    fontSize: 10,
-    color: '#0284C7',
-    fontWeight: '600',
-  },
-  mapLabelTemple: {
-    position: 'absolute',
-    left: 12,
-    bottom: 25,
-    fontSize: 10,
-    color: '#0369A1',
-    fontWeight: '600',
-  },
-  mapLabelCentre: {
-    position: 'absolute',
-    right: 30,
-    bottom: 15,
-    fontSize: 10,
-    color: '#0369A1',
-  },
-  mapMarkerPin: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   locationDetailsRow: {
     flexDirection: 'row',

@@ -1,3 +1,4 @@
+import { PlacesController } from './places.controller';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { Module } from '@nestjs/common';
@@ -10,7 +11,7 @@ import { Event, EventSchema } from './schemas/event.schema';
   imports: [AuthModule, UsersModule,
     MongooseModule.forFeature([{ name: Event.name, schema: EventSchema }]),
   ],
-  controllers: [EventsController],
+  controllers: [EventsController, PlacesController],
   providers: [EventsService],
   exports: [EventsService],
 })

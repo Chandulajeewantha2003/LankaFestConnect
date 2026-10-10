@@ -21,6 +21,9 @@ export interface EventItem {
   category: string;
   eventType: 'Physical Event' | 'Online Event' | string;
   audience: string[];
+  mapsUrl?: string; placeId?: string;
+  latitude?: number;
+  longitude?: number;
   locationName: string;
   locationAddress: string;
   city: string;

@@ -80,3 +80,33 @@ test('update validation accepts editable fields and partial updates, rejects inv
  await assert.rejects(pipe.transform({ ticketPrice: 'invalid' }, metadata));
  await assert.rejects(pipe.transform({ ...valid, _id: 'server-id', viewsCount: 10, organizer: {} }, metadata));
 });
+
+ test('venue identity and coordinates survive publishing, editing, and duplication', async () => {
+  const service = new EventsService(store());
+  const location = { placeId: 'venue-one', latitude: 7.29, longitude: 80.63 };
+  const event = await service.create({ ...base, ...location }, 'owner');
+  for (const [key, value] of Object.entries(location)) assert.equal((await service.findAll())[0][key], value);
+  await service.update(event.id, { placeId: 'venue-two', latitude: 6.92, longitude: 79.84 }, 'owner');
+  const copy = await service.duplicate(event.id, 'owner');
+  assert.equal(copy.placeId, 'venue-two'); assert.equal(copy.latitude, 6.92); assert.equal(copy.longitude, 79.84);
+ });
+
+test('editing a venue replaces its map link and clears stale coordinates', async () => {
+ const service = new EventsService(store());
+ const event = await service.create({ ...base, mapsUrl: 'https://maps.app.goo.gl/oldVenue', placeId: 'old-id', latitude: 7, longitude: 80 }, 'owner');
+ await service.update(event.id, { mapsUrl: 'https://maps.app.goo.gl/newVenue', placeId: null, latitude: null, longitude: null }, 'owner');
+ const saved = (await service.findAll())[0];
+ assert.equal(saved.mapsUrl, 'https://maps.app.goo.gl/newVenue');
+ assert.equal(saved.placeId, null); assert.equal(saved.latitude, null); assert.equal(saved.longitude, null);
+});
+
+test('map links accept share URLs and null for legacy edits, reject unrelated URLs', async () => {
+ const { validate } = require('class-validator');
+ const { UpdateEventDto } = require('../dist/modules/events/dto/update-event.dto');
+ for (const mapsUrl of ['https://maps.app.goo.gl/venue', 'https://www.google.com/maps/place/Venue', null]) {
+  assert.equal((await validate(Object.assign(new UpdateEventDto(), { mapsUrl }))).length, 0);
+ }
+ for (const mapsUrl of ['https://evil.test/maps', 'https://google.com.evil.test/maps', '']) {
+  assert.ok((await validate(Object.assign(new UpdateEventDto(), { mapsUrl }))).length > 0);
+ }
+});
